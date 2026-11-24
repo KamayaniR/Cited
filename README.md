@@ -1,8 +1,45 @@
 # Cited
 
-Cited takes a founder from "here's my product" to qualified meetings booked: it infers an ICP, discovers companies with a source URL for every claim, enriches contacts, drafts outreach, and sends nothing until a human approves it.
+**Cited turns a product description into booked meetings, with a source for every claim and a human approving every message.**
 
-> Work in progress. Built in stages P0 to P8 (see "Build status").
+A B2B founder with no GTM team describes their product. Cited infers the ideal customer profile, discovers companies with a cited source for every lead and signal, enriches contacts, finds warm paths through a knowledge graph, drafts outreach that is checked sentence by sentence against stored evidence, and sends nothing until a person approves it.
+
+- Pitch slide: [docs/slides/viability.png](docs/slides/viability.png)
+- System design: [docs/system-design.md](docs/system-design.md)
+- Demo video script: [docs/demo-script.md](docs/demo-script.md)
+
+![Startup viability slide](docs/slides/viability.png)
+
+## Features
+
+| Feature | What it does | Where |
+|---|---|---|
+| Intake and ICP | Product chat → NAICS codes, size, personas, triggers, each with a confidence score; suggests adjacent segments with evidence | `lib/pipeline/icp.ts`, `app/intake` |
+| Discovery with citations | Tavily search; every lead and signal links to a page search returned, leads without a source are dropped; negative signals filter companies | `lib/pipeline/discovery.ts`, `citations.ts` |
+| Scoring and tiers | `score = 0.6·fit + 0.4·intent`, Tier A ≥ 75, B ≥ 55 | `lib/pipeline/scoring.ts` |
+| Enrichment | Hunter verifies email and MX; Apollo fills LinkedIn, HQ and career history when Hunter misses. Every field shows its source | `lib/pipeline/enrich.ts` |
+| Knowledge graph | Neo4j (in-memory fallback) with three multi-hop queries: warm path, hiring-to-evaluation, competitor displacement | `lib/graph/*`, `app/graph` |
+| Scheduled refresh | Signals refresh every 6 hours, re-tier leads, withdraw drafts on negative signals | `lib/pipeline/refresh.ts`, `vercel.json` |
+| Outreach and claim check | Grounded drafts; every sentence is checked against evidence in Moss; unsupported claims block approval (`422 UNCITED_CLAIM`) | `lib/pipeline/outreach.ts`, `evidence.ts` |
+| Human approval | Batch approval cards, per-message reject reasons back to @builder, schema change approvals | `lib/pipeline/decide.ts`, `components/ApprovalCards.tsx` |
+| Pipeline and analytics | Drag-and-drop Kanban, agent/rep attribution, conversion by industry, tier and A/B variant | `app/pipeline`, `lib/pipeline/analytics.ts` |
+| Audit log | Every action, actor and agent | `app/audit` |
+| Metered billing | Credits per paid action, prepaid wallet and top-up, HTTP 402 when credits run out | `lib/pipeline/billing.ts`, `app/billing` |
+
+### Sponsor integrations
+
+| Sponsor | Role in Cited | Adapter |
+|---|---|---|
+| **Moss** | Evidence memory: grounded drafting, per-sentence claim check in milliseconds, "ask the evidence" search, semantic trigger matching, optional inference | `lib/providers/moss.ts`, `lib/pipeline/evidence.ts` |
+| **Band** | Multi-agent room: @planner → @builder → @reviewer → @security → @human handoffs are mirrored as @mentions; humans approve or reject by replying in the room | `lib/providers/band.ts`, `lib/pipeline/bandDecisions.ts` |
+| **Flexprice** | Usage metering (lead_enriched 2, outreach_sent 1, graph_query 0.5, signal_refresh 0.2 credits), prepaid wallet, top-up | `lib/providers/flexprice.ts` |
+| **Neo4j** | Knowledge graph and Cypher queries | `lib/graph/neo4j.ts` |
+
+## Architecture
+
+See [docs/system-design.md](docs/system-design.md) for the architecture diagram, the graph ontology, every Cypher query with example output, and the agent reasoning loops.
+
+In short: Next.js App Router pages call API routes; routes call pipeline modules; pipeline modules call vendor adapters in `lib/providers/`, each with a mock fallback. State lives in a workspace store; the graph is mirrored to Neo4j after every change.
 
 ## Quick start (mock mode, zero keys)
 
@@ -12,66 +49,67 @@ cp .env.example .env.local   # leave it empty for mock mode
 npm run dev
 ```
 
-Open http://localhost:3000 and click **Load demo data**.
+Open http://localhost:3000 and click **Load demo data**. The seeded demo uses fictional `.example` companies and runs the same way every time.
 
-Every vendor sits behind an adapter in `lib/providers/` with a mock fallback, so the whole app runs with no API keys. Add a vendor's keys to `.env.local` to switch just that vendor to live mode; the top bar shows which vendors are live.
+Every vendor sits behind an adapter with a mock fallback, so the whole app runs with no API keys. Add a vendor's keys to `.env.local` to switch just that vendor to live mode; the top bar shows which vendors are live. `CITED_FORCE_MOCK=true` forces mock mode even with keys set.
 
-## Live mode
+## Environment variables
 
 | Variable | Vendor | Where to get it |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | LLM (Claude) | console.anthropic.com |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | LLM (Claude) | console.anthropic.com |
+| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX` | Evidence memory | portal.usemoss.dev |
 | `TAVILY_API_KEY` | Search | tavily.com |
 | `HUNTER_API_KEY` | Enrichment (primary) | hunter.io → API |
-| `APOLLO_API_KEY` | Enrichment (fallback) | apollo.io → Settings → API |
+| `APOLLO_API_KEY` | Enrichment (fallback, career history) | apollo.io → Settings → API |
 | `SENDGRID_API_KEY`, `SENDGRID_FROM` | Email | sendgrid.com (verified sender) |
 | `DEMO_RECIPIENT`, `SENDING_ENABLED` | Safety | Your demo inbox; sending is off unless `true` |
-| `FLEXPRICE_API_KEY` | Billing | flexprice.io |
-| `BAND_API_KEY`, `BAND_ROOM_ID` | Multi-agent | Band |
-| `NEO4J_URI`, `NEO4J_PASSWORD` | Graph | Neo4j Aura Free |
-| `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Database | supabase.com |
+| `FLEXPRICE_API_KEY`, `FLEXPRICE_BASE_URL` | Billing | flexprice.io |
+| `BAND_API_KEY`, `BAND_ROOM_ID` | Multi-agent room | band.ai (agent key `band_a_…`) |
+| `BAND_PLANNER_KEY`, `BAND_BUILDER_KEY`, `BAND_REVIEWER_KEY`, `BAND_SECURITY_KEY` | Optional per-role agent keys | band.ai |
+| `BAND_API_URL`, `BAND_WAKEUP_SECRET` | Band API base, webhook secret | band.ai |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Graph | Neo4j Aura Free |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Database | supabase.com |
 | `CRON_SECRET` | Scheduled refresh | Any random string |
 
 Database: `supabase db push` applies `supabase/migrations/`. The Neo4j schema in `lib/graph/schema.cypher` runs on startup.
 
-## Moss: evidence memory
-
-Cited's promise is "every claim cited". [Moss](https://moss.dev) is the engine that keeps it:
-
-- **Evidence memory.** Every page search returned (company pages, signals, competitor pages), each company's firmographics and our own product description are indexed in Moss with `companyId` metadata (`lib/pipeline/evidence.ts`).
-- **Grounded drafting.** Before @builder drafts a sequence, it pulls that company's strongest evidence from Moss for the persona and ICP triggers.
-- **Claim check.** @reviewer splits every draft into sentences and searches Moss for each specific claim (names, numbers, events), scoped to that company plus our product docs. Unsupported claims go back to @builder for a fix; a rep edit that adds one is blocked at approval with `422 UNCITED_CLAIM`. Each message shows its claims, their sources and the Moss query time.
-- **Evidence search** in the approval queue: ask "did they change ERP?" and get cited answers in milliseconds.
-- **Semantic trigger matching.** ICP triggers are matched to signals by meaning, which feeds Intent scoring.
-- **Moss Inference** runs the agents' LLM calls when `ANTHROPIC_API_KEY` is not set.
-
-Set `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` (portal.usemoss.dev). Without them an in-memory mock with the same API is used.
-
 ## Safety
 
-- Nothing is sent unless a rep approved it.
+- Nothing is sent unless a rep approved it. Agents are never autonomous on send.
 - Outside production every email goes to `DEMO_RECIPIENT`; `SENDING_ENABLED=false` is a kill switch.
 - LinkedIn messages are drafted only. The rep sends them by hand and clicks "Mark sent".
 - No scraping behind logins. Every lead and signal must cite a URL that search returned.
+- Every drafted sentence is checked against stored evidence; a claim without a source cannot be approved.
+- Graph schema changes proposed by agents are limited to `CREATE CONSTRAINT|INDEX … IF NOT EXISTS` and wait for a human.
+- Keys live only in `.env.local`, which is gitignored.
 
-## Scripts
+## Tests
 
-`npm run dev` · `npm run build` · `npm test` · `npm run typecheck` · `npm run lint`
+```bash
+npm test            # vitest: 76 tests, one file per build stage plus Moss
+npm run typecheck
+npm run lint
+```
+
+Vendor APIs that need keys (Flexprice, Band) are tested against stubbed HTTP that follows their public docs.
 
 ## Project structure
 
 ```
-app/                 pages + API routes (api/state, api/demo/seed, api/health, api/cron/refresh)
-components/          UI
+app/                 pages (intake, discovery, graph, outreach, pipeline, analytics, billing, audit) and API routes
+components/          UI, approval cards, refresh button
 lib/
-  providers/         llm, tavily, hunter, apollo, sendgrid, flexprice, band (each with mock fallback)
-  pipeline/          scoring (P0); icp, discovery, enrich, outreach, refresh (P1+)
-  agents/            planner, builder, reviewer, security (P6)
-  graph/             neo4j.ts, schema.cypher; queries (P4)
+  providers/         llm, moss, tavily, hunter, apollo, sendgrid, flexprice, band (each with a mock fallback)
+  pipeline/          icp, discovery, citations, scoring, enrich, evidence, outreach, review, decide,
+                     refresh, analytics, billing, credits, team, bandDecisions
+  agents/            reviewer, security and shared rules (planner and builder steps run in the pipeline)
+  graph/             model, queries (Cypher + in-memory), neo4j sync, schema.cypher
   seed/              demo fixtures (fictional .example companies)
-  db/                workspace store (memory in mock mode)
+  db/                workspace store
 supabase/migrations/
-docs/
+docs/                system design, viability slide, demo script
+tests/
 vercel.json          cron schedule
 ```
 
@@ -87,8 +125,8 @@ vercel.json          cron schedule
 | P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | Done (in-memory until Neo4j keys are set) |
 | P5 | Flexprice metering and credit gate | Done (mock until FLEXPRICE_API_KEY is set) |
 | P6 | Band agents and approval cards | Done (local agents until Band keys are set) |
-| P7 | Pitch slide, docs, demo video | Next |
-| P8 | Snyk, E2E, monitoring | |
+| P7 | Pitch slide, system design, demo script | Done (video to be recorded) |
+| P8 | Snyk, E2E, monitoring | Next |
 
 ## License
 

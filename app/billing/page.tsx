@@ -39,6 +39,12 @@ export default function BillingPage() {
     } catch (e) { setMsg((e as Error).message); }
     finally { setBusy(null); }
   }
+  async function drain() {
+    setBusy("drain"); setMsg(null);
+    try { await api("/api/demo/credits", { method: "POST", body: { balance: 0 } }); setMsg("Balance set to 0. Paid calls now return 402 until you top up."); await refresh(); }
+    catch (e) { setMsg((e as Error).message); }
+    finally { setBusy(null); }
+  }
   async function sync() {
     setBusy("sync"); setMsg(null);
     try { const r = await api<{ attempted: number; synced: number }>("/api/billing/sync", { method: "POST" }); setMsg(`Synced ${r.synced} of ${r.attempted} pending events to Flexprice.`); await refresh(); await load(); }
@@ -71,6 +77,7 @@ export default function BillingPage() {
             ))}
           </div>
           <div className="mt-2 text-[12px] text-muted">${s?.overageUsdPerCredit.toFixed(2) ?? "0.08"} per credit. Demo only: no card is charged.</div>
+          {!s?.flexprice.wallet && <button className="mt-1 text-[12px] text-muted underline" onClick={drain} disabled={busy !== null}>Demo: set balance to 0</button>}
         </Card>
         <Card className="p-4">
           <div className="flex items-center justify-between">

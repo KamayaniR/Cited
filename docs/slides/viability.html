@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cited: startup viability</title>
+<style>
+  :root { --paper:#FAF9F6; --ink:#14161A; --accent:#2F5D50; --muted:#6B7280; --line:#E5E5E5; --a:#059669; --b:#D97706; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; background: var(--paper); color: var(--ink); font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+  .slide { padding: 60px 88px; height: 1080px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 26px; }
+  .kicker { font-size: 22px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+  h1 { font-family: "Source Serif 4", Georgia, serif; font-weight: 500; font-size: 52px; line-height: 1.12; margin-top: 10px; max-width: 1650px; }
+  .pain { font-size: 25px; color: var(--muted); max-width: 1500px; line-height: 1.4; }
+  .pain b { color: var(--ink); font-weight: 600; }
+  .grid { display: grid; grid-template-columns: 1fr 1.1fr 1.2fr; gap: 24px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px; }
+  .card h2 { font-size: 20px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 25px; } td { padding: 14px 0 !important; }
+  td { padding: 10px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:first-child td { border-top: 0; }
+  td.n { text-align: right; font-family: "JetBrains Mono", Menlo, monospace; font-size: 22px; white-space: nowrap; padding-left: 16px; }
+  .who li { font-size: 25px; line-height: 1.35; margin-bottom: 28px; list-style: none; }
+  .who li b { display: block; font-size: 25px; }
+  .who li span { color: var(--muted); }
+  ol.diff { padding-left: 0; counter-reset: d; }
+  ol.diff li { list-style: none; font-size: 25px; line-height: 1.35; margin-bottom: 24px; padding-left: 52px; position: relative; }
+  ol.diff li::before { counter-increment: d; content: counter(d); position: absolute; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 20px; display: grid; place-items: center; }
+  ol.diff b { display: block; }
+  ol.diff span { color: var(--muted); }
+  .foot { display: flex; justify-content: space-between; align-items: end; font-size: 20px; color: var(--muted); }
+  .foot .vs b { color: var(--ink); }
+  .brand { font-family: "Source Serif 4", Georgia, serif; font-size: 40px; color: var(--ink); }
+  .sub { font-size: 18px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="slide">
+  <div>
+    <div class="kicker">Startup viability</div>
+    <h1>Cited turns a product description into booked meetings, with a source for every claim and a human approving every message.</h1>
+  </div>
+  <p class="pain"><b>The pain:</b> a B2B founder with no GTM team spends 10 to 15 hours a week stitching a list tool, an enrichment tool, a sequencer and a spreadsheet, and still sends generic email nobody can trace to a real reason to reach out.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Who pays</h2>
+      <ul class="who" style="padding:0">
+        <li><b>Seed to Series A B2B founders</b><span>No SDR yet. Need the first 20 meetings without hiring.</span></li>
+        <li><b>Small sales teams, 1 to 5 reps</b><span>One workspace instead of four tools, with an audit trail.</span></li>
+        <li><b>GTM agencies</b><span>Many client ICPs, with cited evidence to show clients.</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2>Pricing, metered by Flexprice</h2>
+      <table>
+        <tr><td>Free · 100 credits once</td><td class="n">$0</td></tr>
+        <tr><td>Founder · 1,500 credits</td><td class="n">$99/mo</td></tr>
+        <tr><td>Team · 7,500 credits, 5 seats</td><td class="n">$399/mo</td></tr>
+        <tr><td>Top-up</td><td class="n">$0.08/credit</td></tr>
+      </table>
+      <p class="sub" style="margin-top:12px;font-size:19px">Credits: 2 per lead enriched, 1 per approved send, 0.5 per graph query, 0.2 per refresh. Drafts are free, so customers pay only for outreach they chose to send.</p>
+    </div>
+    <div class="card">
+      <h2>Why Cited wins</h2>
+      <ol class="diff">
+        <li><b>Every claim is cited and checked.</b><span>Leads without a source are dropped; every drafted sentence is checked against stored evidence (Moss) before a human sees it.</span></li>
+        <li><b>The graph finds the warm way in.</b><span>Shared employers and schools, hiring-to-evaluation, competitor renewal windows.</span></li>
+        <li><b>A human approves every send.</b><span>Never autonomous on send, unlike AI SDRs; the approval gate and audit log are the product.</span></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="vs">Instead of <b>Apollo / ZoomInfo</b> (lists), <b>Clay</b> (workflow building), <b>Instantly / Outreach</b> (volume sending), <b>11x / Artisan</b> (autonomous AI SDRs).<div class="sub">Revenue grows with the customer: $1.2k to $5k a year per account, founders become teams, agencies add ICPs.</div></div>
+    <div class="brand">Cited</div>
+  </div>
+</div>
+</body>
+</html>
