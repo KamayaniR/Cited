@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import type { Workspace, AuditEntry, AgentEvent, Actor, AgentRole } from "@/lib/types";
 import { newId, nowIso } from "@/lib/ids";
+import { mirrorEvent } from "@/lib/providers/band";
 
 /**
  * Workspace store.
@@ -66,5 +67,6 @@ export function audit(ws: Workspace, e: { actor: Actor; agent?: string | null; a
 export function agentEvent(ws: Workspace, e: { from: AgentRole; to?: AgentRole | null; kind: string; text: string; tokens?: number; costUsd?: number }): AgentEvent {
   const ev: AgentEvent = { id: newId("aev"), fromRole: e.from, toRole: e.to ?? null, kind: e.kind, text: e.text, tokens: e.tokens ?? 0, costUsd: e.costUsd ?? 0, at: nowIso() };
   ws.agentEvents.push(ev);
+  void mirrorEvent(ev); // Band room mirror; a no-op in local mode, never throws
   return ev;
 }

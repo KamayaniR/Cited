@@ -85,3 +85,21 @@ Plans: Free (100 credits once), Founder $99/month (1,500), Team $399/month (7,50
 - **Meter.** `charge` writes a `usage_events` row and sends it to Flexprice `POST /events` with `external_customer_id` = org id and `event_id` = the row id, so retries are deduplicated. Rows that didn't land (`flexprice_synced = false`) are retried by the cron route and by "Sync now" on /billing.
 - **Wallet.** On the first top-up or sync with a key, Cited finds or creates the Flexprice customer (`GET /customers/external/{id}`, else `POST /customers`) and a prepaid wallet loaded with the current balance (`POST /wallets`). Top-ups go to `POST /wallets/{id}/top-up` with `PURCHASED_CREDIT_DIRECT` and an idempotency key; /billing shows the wallet's real-time balance (`GET /wallets/{id}/balance/real-time`).
 - `POST /api/billing/topup { amount }` (10 to 5,000 whole credits) → `{ balance }`; `GET /api/billing` → balance, plan, prices, usage by event, Flexprice state.
+
+## Multi-agent orchestration with Band (P6)
+
+Four roles (planner, builder, reviewer, security) hand work to each other with fixed-shape lines (`@builder TASK discover  icp=v1 ...`, `@reviewer READY drafts ...`, `@builder FIX ...`, `@security READY ...`, `@human APPROVAL ...`). Every handoff is an `agent_events` row, shown in the Agent Thinking panel.
+
+**Band room (`lib/providers/band.ts`).** With `BAND_API_KEY` (an agent key) and `BAND_ROOM_ID`, every agent event is mirrored into the room as it is written:
+- A handoff to another participant becomes a real message with a structured `mentions` entry (Band only delivers to mentioned participants). Room participants are matched to roles by name ("Cited Builder" → builder); the human is the room's user.
+- Anything without another participant to address becomes a room event (`task` / `thought`).
+- Approval requests also post a blocking `attention` event (`kind: review`).
+- Optional `BAND_<ROLE>_KEY` lets each role speak as its own agent; otherwise all roles share one key and label themselves.
+
+**Human decisions in the room.** A person replies to one of our agents, for example `approve b_1`, `approve b_1 except msg_x (too long for a CFO)`, `reject msg_x <reason>`, `edit msg_x subject: ...`, `reject apr_schema_1 <reason>`. Cited reads them with the Agent API queue (`messages/next` → `processing` → `processed`/`failed`), answers in the room, and ignores messages from agents (only a person can approve). Polling runs from the "Check Band for decisions" button, the 6-hourly cron, and `/api/webhooks/band` (Band's wake-up URL, verified with the Standard Webhooks signature or a bearer secret).
+
+**One decision path (`lib/pipeline/decide.ts`).** The queue UI (`POST /api/outreach/:id/review`, `POST /api/approvals/:id`) and Band replies call the same functions, so they write the same `approvals`, `audit_log` and `agent_events` rows. Only `audit_log.agent` differs: `ui` or `band:<room>`.
+- Outreach batch: reject the listed messages (each goes back to @builder with its reason as a `FIX`), approve the rest (Moss claim check, credit gate, demo-inbox send). The batch closes when nothing in it is waiting.
+- Schema change: agents may only propose `CREATE CONSTRAINT|INDEX ... IF NOT EXISTS`. Approve runs it on Neo4j (or records it for the in-memory graph); reject makes @planner re-plan without it. The seed includes @builder asking for an `attended` edge.
+
+Without Band keys the roles run in-process, write the same rows, and the top bar shows "Band: offline (local agents)".

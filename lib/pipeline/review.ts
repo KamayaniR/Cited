@@ -39,9 +39,9 @@ export function applyEdit(m: Message, edited?: { subject?: string | null; body?:
   if (edited.subject !== undefined && edited.subject !== m.subject) { m.subject = edited.subject; m.editedByRep = true; }
 }
 
-export function reject(ws: Workspace, m: Message, note?: string) {
+export function reject(ws: Workspace, m: Message, note?: string, agent = "ui") {
   m.status = "rejected";
   m.review = { ...(m.review ?? {}), notes: [...(m.review?.notes ?? []), `Rejected by rep${note ? `: ${note}` : ""}`] };
-  audit(ws, { actor: "rep", agent: "ui", action: "message_rejected", target: m.id, detail: note ?? "" });
+  audit(ws, { actor: "rep", agent, action: "message_rejected", target: m.id, detail: note ?? "" });
   agentEvent(ws, { from: "human", to: "builder", kind: "decision", text: `REJECTED ${m.id}${note ? `  reason="${note}"` : ""}` });
 }

@@ -86,8 +86,8 @@ vercel.json          cron schedule
 | P3 | Kanban, attribution, audit, analytics | Done |
 | P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | Done (in-memory until Neo4j keys are set) |
 | P5 | Flexprice metering and credit gate | Done (mock until FLEXPRICE_API_KEY is set) |
-| P6 | Band agents and approval cards | Next |
-| P7 | Pitch slide, docs, demo video | |
+| P6 | Band agents and approval cards | Done (local agents until Band keys are set) |
+| P7 | Pitch slide, docs, demo video | Next |
 | P8 | Snyk, E2E, monitoring | |
 
 ## License

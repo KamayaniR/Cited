@@ -5,6 +5,7 @@ import { Badge, Button, Card, PageTitle, TierBadge } from "@/components/ui";
 import { MessageCard } from "@/components/MessageCard";
 import { api } from "@/components/api";
 import { EvidenceSearch } from "@/components/EvidenceSearch";
+import { ApprovalCards, CheckBandButton } from "@/components/ApprovalCards";
 
 const FILTERS = [
   { key: "open", label: "Needs review", match: (s: string) => s === "pending_approval" || s === "needs_fix" },
@@ -36,9 +37,11 @@ export default function OutreachPage() {
       <PageTitle kicker="Approval queue" title="Nothing sends without you">
         <div className="flex items-center gap-3">
           {msg && <span className="text-[12px] text-muted">{msg}</span>}
+          <CheckBandButton />
           <Button onClick={generate} disabled={busy || undrafted === 0}>{busy ? "Drafting…" : undrafted ? `Draft sequences for ${undrafted} leads` : "All leads drafted"}</Button>
         </div>
       </PageTitle>
+      <ApprovalCards />
       <div className="mb-4 flex gap-1.5">
         {FILTERS.map((x) => (
           <button key={x.key} onClick={() => setFilter(x.key)} className={`rounded-[6px] px-2.5 py-1 text-[12px] ${filter === x.key ? "bg-ink text-white" : "hover:bg-line/50"}`}>

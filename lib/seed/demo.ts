@@ -153,6 +153,9 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
   ev("reviewer", "security", "handoff", "@security READY batch=b_1  reviewer=pass", 28, 640);
   ev("security", "human", "approval", "@human APPROVAL outreach  batch=b_1  messages=3  links=0 domains (all cited)", 27, 410);
 
+  // Second HITL beat: @builder asks for a schema change; a human decides (the demo rejects it).
+  ev("builder", "human", "approval", "@human APPROVAL  schema=apr_schema_1  adds=Event_node_+_attended_edge  Conference attendance would add warm paths through shared events", 20);
+  ws.approvals.push({ id: "apr_schema_1", kind: "schema", requestedBy: "builder", payload: { cypher: "CREATE CONSTRAINT event_id IF NOT EXISTS FOR (n:Event) REQUIRE n.id IS UNIQUE", reason: "Conference attendance would add warm paths through shared events", adds: "Event node + attended edge" }, status: "pending", decidedBy: null, decidedVia: null, note: null, at: at(20) });
   ws.approvals.push({ id: "apr_b1", kind: "outreach", requestedBy: "security", payload: { batch: "b_1", messageIds: ["msg_nw_e1", "msg_nw_l1", "msg_nw_e2"] }, status: "pending", decidedBy: null, decidedVia: null, note: null, at: at(27) });
 
   ws.auditLog.unshift(
