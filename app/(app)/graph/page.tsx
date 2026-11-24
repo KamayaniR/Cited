@@ -92,11 +92,10 @@ export default function GraphPage() {
             <div className="flex items-center gap-2 border-b border-line px-3 py-2 text-[11px] text-muted">
               <Code2 size={13} /><span className="font-semibold tracking-wider uppercase">Cypher</span>
               <span className="ml-auto flex items-center gap-1">
-                <Badge tone={res.engine === "neo4j" ? "green" : "neutral"} title={res.engine === "memory" ? "Neo4j isn't connected, so the same query ran on the in-memory graph with the same row shape." : "Ran on Neo4j"}>{res.engine}</Badge>
+                <Badge tone={res.engine === "neo4j" ? "green" : "neutral"} title={res.fallback ?? (res.engine === "memory" ? "Neo4j isn't connected, so the same query ran on the in-memory graph with the same row shape." : "Ran on Neo4j")}>{res.fallback ? "memory · fallback" : res.engine}</Badge>
                 <Badge icon={Timer}>{res.ms.toFixed(1)} ms</Badge>
               </span>
             </div>
-            {res.fallback && <div className="px-3 pt-2 text-[12px] text-tier-b">{res.fallback}</div>}
             <pre className="max-h-[420px] overflow-auto bg-ink p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words text-white">{res.cypher}</pre>
           </Card>
         </div>

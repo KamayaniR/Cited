@@ -25,7 +25,8 @@ async function driver(): Promise<Driver> {
 
 export async function runCypher<T = Record<string, unknown>>(cypher: string, params: Record<string, unknown> = {}): Promise<T[]> {
   const d = await driver();
-  await ensureSchema();
+  // Constraints are an optimisation; a schema problem must not stop the query itself.
+  await ensureSchema().catch((e) => console.warn("[neo4j] schema setup failed:", (e as Error).message));
   const session = d.session();
   try {
     const res = await session.run(cypher, params);
@@ -40,7 +41,8 @@ export async function ensureSchema() {
   if (g.__neo4jSchema) return;
   const d = await driver();
   const file = fs.readFileSync(path.join(process.cwd(), "lib/graph/schema.cypher"), "utf8");
-  const statements = file.split(";").map((s) => s.replace(/\/\/.*$/gm, "").trim()).filter(Boolean);
+  // Strip comments before splitting: a comment may itself contain a ";".
+  const statements = file.replace(/\/\/.*$/gm, "").split(";").map((s) => s.trim()).filter(Boolean);
   const session = d.session();
   try {
     for (const s of statements) await session.run(s);

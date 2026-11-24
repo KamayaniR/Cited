@@ -14,8 +14,9 @@ export async function runGraphQuery(ws: Workspace, q: QueryKey): Promise<QueryRe
       const rows = await runCypher<Record<string, unknown>>(CYPHER[q], { org: ws.org.id });
       return { rows: rows.map(plain) as unknown as Row[], engine: "neo4j", cypher: CYPHER[q], ms: performance.now() - t };
     } catch (e) {
+      console.warn("[neo4j] query failed, using the in-memory graph:", (e as Error).message);
       const rows = queryMemory(ws, q);
-      return { rows, engine: "memory", cypher: CYPHER[q], ms: performance.now() - t, fallback: `Neo4j failed (${(e as Error).message}); answered from the in-memory graph` };
+      return { rows, engine: "memory", cypher: CYPHER[q], ms: performance.now() - t, fallback: "Neo4j didn't answer, so the same query ran on the in-memory graph." };
     }
   }
   return { rows: queryMemory(ws, q), engine: "memory", cypher: CYPHER[q], ms: performance.now() - t };
