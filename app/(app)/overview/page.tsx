@@ -4,6 +4,7 @@ import { Building2, Filter, Users, Inbox, Link2, MessageSquareText, Search, Shar
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Button, Card, Donut, PageTitle, SectionTitle, Stat, BarRow } from "@/components/ui";
 import type { Stage } from "@/lib/types";
+import { ClaimCard, MiniGraph } from "@/components/landing/ClaimCard";
 
 const LOOP = [
   { icon: MessageSquareText, label: "Intake", href: "/intake", tip: "Product → ICP, a human approves" },
@@ -25,6 +26,12 @@ export default function Overview() {
   const pending = ws?.messages.filter((m) => m.status === "pending_approval" || m.status === "needs_fix").length ?? 0;
   const byStage = STAGES.map((s) => ({ ...s, n: ws?.leads.filter((l) => l.stage === s.stage).length ?? 0 }));
   const maxStage = Math.max(1, ...byStage.map((s) => s.n));
+  // The newest checked draft, from real workspace data: each sentence with its source host or "not found".
+  const checked = ws?.messages.filter((m) => m.review?.grounding?.claims.length).at(-1);
+  const person = checked && ws?.people.find((p) => ws.leads.find((l) => l.id === checked.leadId)?.personId === p.id);
+  const company = person && ws?.companies.find((c) => c.id === person.companyId);
+  const host = (u: string | null) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : "not found"; } catch { return "source"; } };
+  const draft = checked ? { to: `To ${person?.name ?? "buyer"}${person ? ` · ${person.title}${company ? `, ${company.name}` : ""}` : ""}`, lines: checked.review!.grounding!.claims.slice(0, 5).map((c) => ({ text: c.sentence, source: c.supported ? host(c.url) : "not found", ok: c.supported })) } : null;
   const steps = ws ? [Boolean(ws.icp), live.length > 0, live.length > 0, ws.people.length > 0, ws.messages.length > 0, ws.messages.some((m) => m.status === "sent"), ws.leads.some((l) => l.stage !== "matched")] : [];
 
   return (
@@ -42,6 +49,16 @@ export default function Overview() {
         <Stat icon={Link2} label="Citations" value={ws?.citations.length ?? 0} tone="green" tip="Source URLs behind leads and signals" />
       </div>
 
+      {draft && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <Card className="p-3"><SectionTitle icon={Share2}>Knowledge graph</SectionTitle><Link href="/graph" aria-label="Open the knowledge graph"><MiniGraph className="h-[220px] w-full" /></Link></Card>
+          <div>
+            <SectionTitle icon={Mail}>Latest draft, checked line by line</SectionTitle>
+            <Link href="/outreach"><ClaimCard to={draft.to} lines={draft.lines} animate={false} /></Link>
+          </div>
+        </div>
+      )}
+
       <Card className="mt-4 p-4">
         <SectionTitle>The loop</SectionTitle>
         <ol className="flex flex-wrap items-center gap-1">
@@ -58,7 +75,7 @@ export default function Overview() {
 
       <div className="mt-4 grid gap-4 md:grid-cols-[auto_1fr]">
         <Card className="flex items-center gap-5 p-4">
-          <Donut segments={[{ name: "Tier A", value: tiers.A, color: "#059669" }, { name: "Tier B", value: tiers.B, color: "#D97706" }, { name: "Tier C", value: tiers.C, color: "#9CA3AF" }]} label={<><b className="text-[18px]">{live.length}</b><br /><span className="text-muted">cos</span></>} />
+          <Donut segments={[{ name: "Tier A", value: tiers.A, color: "#1F8A5B" }, { name: "Tier B", value: tiers.B, color: "#D97706" }, { name: "Tier C", value: tiers.C, color: "#9CA3AF" }]} label={<><b className="text-[18px]">{live.length}</b><br /><span className="text-muted">cos</span></>} />
           <ul className="space-y-1.5 text-[12px]">
             {(["A", "B", "C"] as const).map((t) => <li key={t} className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${t === "A" ? "bg-tier-a" : t === "B" ? "bg-tier-b" : "bg-tier-c"}`} />Tier {t}<b className="ml-2">{tiers[t]}</b></li>)}
           </ul>

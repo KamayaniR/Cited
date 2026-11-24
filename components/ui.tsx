@@ -2,6 +2,7 @@ import type { ReactNode, ComponentType } from "react";
 import type { Tier, Actor } from "@/lib/types";
 import { Tip, InfoTip } from "./Tip";
 import { Bot, User } from "lucide-react";
+import { CountUp } from "./landing/motion";
 
 export type Tone = "neutral" | "green" | "amber" | "red" | "blue" | "violet" | "accent";
 export const TONES: Record<Tone, string> = {
@@ -112,10 +113,10 @@ export function IconButton({ icon: I, label, tone = "neutral", className = "", .
 /** Stat tile: icon, big number, short label; detail goes in the tooltip. */
 export function Stat({ icon: I, label, value, tone = "accent", tip, sub }: { icon: Icon; label: string; value: ReactNode; tone?: Tone; tip?: ReactNode; sub?: ReactNode }) {
   const body = (
-    <Card className="flex items-center gap-3 p-3.5">
+    <Card className="c-rise flex items-center gap-3 p-3.5">
       <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[8px] ${TONES[tone]}`}><I size={18} /></span>
       <div className="min-w-0">
-        <div className="text-[22px] leading-none font-semibold tabular-nums">{value}</div>
+        <div className="font-serif text-[26px] leading-none tabular-nums">{typeof value === "number" || typeof value === "string" ? <CountUp value={String(value)} /> : value}</div>
         <div className="mt-1 truncate text-[12px] text-muted">{label}{sub && <span className="ml-1">{sub}</span>}</div>
       </div>
     </Card>

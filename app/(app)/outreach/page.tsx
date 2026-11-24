@@ -73,6 +73,9 @@ function LeadCard({ leadId, ms }: { leadId: string; ms: Message[] }) {
   const signals = ws.signals.filter((s) => s.companyId === company.id);
   const sorted = [...ms].sort((a, b) => a.step - b.step);
   const [first, ...rest] = sorted;
+  const claims = ms.flatMap((m) => m.review?.grounding?.claims ?? []);
+  const okN = claims.filter((c) => c.supported).length;
+  const pct = claims.length ? okN / claims.length : 1;
   return (
     <Card className="mb-3 p-3.5">
       <div className="mb-3 flex flex-wrap items-center gap-2.5">
@@ -80,6 +83,10 @@ function LeadCard({ leadId, ms }: { leadId: string; ms: Message[] }) {
         <Avatar name={person.name} />
         <div className="leading-tight"><div className="text-[13px] font-medium">{person.name}</div><div className="text-[11px] text-muted">{person.title} · {company.name}</div></div>
         {lead.stage !== "matched" && <Badge tone="green">{lead.stage.replace("_", " ")}</Badge>}
+        <span className="flex items-center gap-2" title={`${okN} of ${claims.length} claims matched stored evidence`}>
+          <span className="h-1.5 w-24 overflow-hidden rounded-full bg-line"><span className={`c-grow-x block h-full rounded-full ${pct === 1 ? "bg-tier-a" : pct >= 0.75 ? "bg-tier-b" : "bg-danger"}`} style={{ width: `${pct * 100}%` }} /></span>
+          <span className="font-mono text-[10.5px] text-muted">{claims.length ? `${okN}/${claims.length} verified` : "verified"}</span>
+        </span>
         <span className="ml-auto flex items-center gap-3 text-[12px] text-muted">
           <button onClick={() => setAsk((v) => !v)} className="inline-flex items-center gap-1 hover:text-ink"><Search size={13} />Ask the evidence</button>
           {rest.length > 0 && <button onClick={() => setMore((v) => !v)} aria-expanded={more} className="inline-flex items-center gap-1 hover:text-ink">{more ? "Hide follow-ups" : `Show ${rest.length} follow-up${rest.length > 1 ? "s" : ""}`}<ChevronDown size={13} className={more ? "rotate-180" : ""} /></button>}

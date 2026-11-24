@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Brain, ChevronRight, PanelRightClose, PanelRightOpen, Compass, Hammer, Eye, Shield, User, Cog } from "lucide-react";
+import { Brain, PanelRightClose, PanelRightOpen, Compass, Hammer, Eye, Shield, User, Cog } from "lucide-react";
 import { useWorkspace } from "./WorkspaceProvider";
 import { Tip } from "./Tip";
 import type { AgentEvent } from "@/lib/types";
@@ -13,6 +13,7 @@ export const ROLES: Record<string, { icon: typeof Brain; cls: string; label: str
   human: { icon: User, cls: "bg-rep/12 text-rep", label: "you" },
   system: { icon: Cog, cls: "bg-line text-muted", label: "system" },
 };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const VERB_TONE: Record<string, string> = { TASK: "bg-accent/10 text-accent", READY: "bg-tier-a/10 text-tier-a", APPROVAL: "bg-tier-b/15 text-tier-b", APPROVED: "bg-tier-a/10 text-tier-a", FIX: "bg-danger/10 text-danger", REPLAN: "bg-agent/10 text-agent", REJECTED: "bg-danger/10 text-danger", BLOCK: "bg-danger/10 text-danger" };
 
 export function RoleChip({ role }: { role: string }) {
@@ -44,40 +45,60 @@ export function AgentPanel() {
       </aside>
     );
   }
+  const latest = events.at(-1);
+  const newestFirst = [...events].reverse().slice(0, 60);
+  const recent = latest && Date.now() - new Date(latest.at).getTime() < 20_000 ? latest.fromRole : null;
   return (
-    <aside className="hidden w-[320px] shrink-0 border-l border-line xl:block" aria-label="Agent Thinking">
+    <aside className="hidden w-[300px] shrink-0 border-l border-line xl:block" aria-label="Agent Thinking">
       <div className="sticky top-12 flex max-h-[calc(100vh-3rem)] flex-col">
-        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-          <Brain size={15} className="text-accent" />
-          <div className="text-[12px] font-semibold tracking-wider text-accent uppercase">Agent Thinking</div>
-          <span className="flex -space-x-1">{["planner", "builder", "reviewer", "security"].map((r) => <RoleChip key={r} role={r} />)}</span>
+        <div className="flex items-center gap-2 px-4 pt-4">
+          <div className="font-mono text-[11px] tracking-[0.12em] text-muted">AGENTS</div>
           <button onClick={() => setOpen(false)} aria-label="Collapse" className="ml-auto text-muted hover:text-ink"><PanelRightClose size={15} /></button>
         </div>
-        <ol className="flex-1 overflow-y-auto px-3 py-2">
-          {events.length === 0 && <li className="flex items-center gap-2 px-1 py-4 text-[12px] text-muted"><Brain size={14} />Idle</li>}
-          {events.map((e) => {
-            const p = parse(e);
-            return (
-              <li key={e.id} className="group border-b border-line/60 py-2 last:border-0">
-                <Tip content={e.text} className="block">
-                  <div className="flex items-center gap-1.5">
-                    <RoleChip role={e.fromRole} />
-                    {e.toRole && <><ChevronRight size={12} className="text-muted" /><RoleChip role={e.toRole} /></>}
-                    {p.verb && <span className={`rounded-[4px] px-1.5 py-0.5 font-mono text-[10px] font-semibold ${VERB_TONE[p.verb] ?? "bg-line/70 text-ink"}`}>{p.verb}</span>}
-                    <span className="ml-auto font-mono text-[10px] text-muted">{new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                  </div>
-                  <div className="mt-1 line-clamp-2 pl-[30px] text-[12px] leading-snug">{p.subject || e.text}</div>
-                  {p.args.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1 pl-[30px]">
-                      {p.args.slice(0, 4).map((a) => <span key={a} className="rounded-[4px] bg-paper px-1 font-mono text-[10px] text-muted">{a.replace(/_/g, " ")}</span>)}
-                    </div>
-                  )}
-                </Tip>
-              </li>
-            );
-          })}
+        <div className="flex justify-between px-4 pt-3 pb-3">
+          {(["planner", "builder", "reviewer", "security"] as const).map((r) => (
+            <span key={r} className="flex flex-col items-center gap-1 text-[10px] text-muted">
+              <span className={`grid h-9 w-9 place-items-center rounded-full border font-serif text-[14px] transition ${recent === r ? "border-accent bg-accent text-white shadow-[0_0_0_6px_rgba(106,53,224,0.2)]" : "border-accent/20 bg-accent/10 text-accent"}`}>{r[0].toUpperCase()}</span>
+              {r[0].toUpperCase() + r.slice(1)}
+            </span>
+          ))}
+        </div>
+        <ol className="flex-1 space-y-1.5 overflow-y-auto border-t border-line px-3 py-3">
+          {events.length === 0 && <li className="flex items-center gap-2 px-1 py-4 text-[12px] text-muted"><Brain size={14} />Idle. Run the loop to watch them work.</li>}
+          {newestFirst.map((e, i) => (
+            <li key={e.id} className={`rounded-[10px] border border-line bg-white px-2.5 py-1.5 ${i < 8 ? "c-rise" : ""}`} style={i < 8 ? { animationDelay: `${i * 60}ms` } : undefined}>
+              <Tip content={e.text} className="block">
+                <div className="flex items-start gap-2 text-[12px] leading-snug">
+                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${DOT[e.fromRole] ?? "bg-muted"}`} />
+                  <span className="line-clamp-2 flex-1">{friendly(e)}</span>
+                  <span className="shrink-0 font-mono text-[9.5px] text-muted">{new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+              </Tip>
+            </li>
+          ))}
         </ol>
       </div>
     </aside>
   );
+}
+
+const DOT: Record<string, string> = { planner: "bg-accent", builder: "bg-agent", reviewer: "bg-tier-b", security: "bg-danger", human: "bg-rep", system: "bg-muted" };
+const NAME = (r?: string | null) => (r === "human" ? "You" : r ? r[0].toUpperCase() + r.slice(1) : "");
+
+/** One short human sentence per event; the raw protocol line stays in the hover tip. */
+function friendly(e: AgentEvent): string {
+  const p = parse(e);
+  const subject = p.subject.replace(/@\w+/g, "").trim();
+  switch (p.verb) {
+    case "TASK": return `${NAME(e.fromRole)} asked ${NAME(e.toRole)} to ${subject || "start"}`;
+    case "READY": return `${NAME(e.fromRole)} handed ${subject || "work"} to ${NAME(e.toRole)}`;
+    case "APPROVAL": return `Waiting on you: ${subject || "approval"}`;
+    case "APPROVED": return `You approved ${subject}`;
+    case "REJECTED": return `You rejected ${subject}`;
+    case "FIX": return `Reviewer sent a draft back for a fix`;
+    case "BLOCK": return `Security blocked a message`;
+    case "ESCALATE": return `Reviewer needs you on a draft`;
+    case "REPLAN": return `Planner is re-planning`;
+    default: return subject || e.text;
+  }
 }
