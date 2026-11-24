@@ -34,6 +34,19 @@ Every vendor sits behind an adapter in `lib/providers/` with a mock fallback, so
 
 Database: `supabase db push` applies `supabase/migrations/`. The Neo4j schema in `lib/graph/schema.cypher` runs on startup.
 
+## Moss: evidence memory
+
+Cited's promise is "every claim cited". [Moss](https://moss.dev) is the engine that keeps it:
+
+- **Evidence memory.** Every page search returned (company pages, signals, competitor pages), each company's firmographics and our own product description are indexed in Moss with `companyId` metadata (`lib/pipeline/evidence.ts`).
+- **Grounded drafting.** Before @builder drafts a sequence, it pulls that company's strongest evidence from Moss for the persona and ICP triggers.
+- **Claim check.** @reviewer splits every draft into sentences and searches Moss for each specific claim (names, numbers, events), scoped to that company plus our product docs. Unsupported claims go back to @builder for a fix; a rep edit that adds one is blocked at approval with `422 UNCITED_CLAIM`. Each message shows its claims, their sources and the Moss query time.
+- **Evidence search** in the approval queue: ask "did they change ERP?" and get cited answers in milliseconds.
+- **Semantic trigger matching.** ICP triggers are matched to signals by meaning, which feeds Intent scoring.
+- **Moss Inference** runs the agents' LLM calls when `ANTHROPIC_API_KEY` is not set.
+
+Set `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` (portal.usemoss.dev). Without them an in-memory mock with the same API is used.
+
 ## Safety
 
 - Nothing is sent unless a rep approved it.
@@ -69,6 +82,7 @@ vercel.json          cron schedule
 | P0 | Skeleton, schema, adapters with mocks, demo seed, app shell | Done |
 | P1 | Intake → ICP → discovery with citations → competitors → scoring | Done |
 | P2 | Enrichment, sequences, HITL queue, demo-inbox send, manual LinkedIn | Done |
+| Moss | Evidence memory, grounded drafting, claim check, evidence search, semantic triggers, Moss Inference | Done |
 | P3 | Kanban, attribution, audit, analytics | Next |
 | P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | |
 | P5 | Flexprice metering and credit gate | |

@@ -28,6 +28,7 @@ export const POST = route(async (req: Request) => {
     all.push(...r.messages);
     mutate((ws) => {
       ws.messages.push(...r.messages);
+      agentEvent(ws, { from: "builder", to: "builder", kind: "retrieval", text: `Moss: ${r.evidence.count} evidence docs for ${lead.id} in ${r.evidence.ms.toFixed(1)} ms; claim check ${r.claimMs.toFixed(1)} ms (${r.evidence.engine})` });
       agentEvent(ws, { from: "builder", to: "reviewer", kind: "handoff", text: formatHandoff({ to: "reviewer", verb: "READY", args: { batch, lead: lead.id, messages: String(r.messages.length) }, rest: "drafts" }), tokens: r.tokens, costUsd: r.costUsd });
       r.fixes.slice(0, -1).forEach((f, i) => f.length && agentEvent(ws, { from: "reviewer", to: "builder", kind: "fix", text: `@builder FIX  batch=${batch}  round=${i + 1}  ${f.join("; ")}` }));
       const final = r.fixes[r.fixes.length - 1];

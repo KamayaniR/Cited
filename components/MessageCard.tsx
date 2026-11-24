@@ -16,7 +16,7 @@ export function MessageCard({ m, person, signals, refresh }: { m: Message; perso
 
   const act = async (fn: () => Promise<unknown>) => {
     setBusy(true); setError(null);
-    try { await fn(); setEditing(false); await refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try { await fn(); setEditing(false); } catch (e) { setError((e as Error).message); } finally { await refresh(); setBusy(false); }
   };
   const edited = editing ? { subject: m.channel === "email" ? subject : undefined, body } : undefined;
   const review = (decision: "approve" | "reject" | "edit", note?: string) =>
@@ -53,6 +53,28 @@ export function MessageCard({ m, person, signals, refresh }: { m: Message; perso
       )}
 
       {sig.map((s) => <a key={s.id} href={s.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 block text-accent hover:underline">Signal: {s.summary}</a>)}
+      {m.review?.grounding && m.review.grounding.claims.length > 0 && (
+        <div className="mt-2 rounded-[6px] bg-paper p-2">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
+            <span className="font-semibold uppercase tracking-wider">Claim check</span>
+            <span className="font-mono">Moss · {m.review.grounding.ms.toFixed(1)} ms</span>
+          </div>
+          <ul className="space-y-1">
+            {m.review.grounding.claims.map((c) => (
+              <li key={c.sentence} className="flex gap-1.5">
+                <span className={c.supported ? "text-tier-a" : "text-danger"}>{c.supported ? "✓" : "✗"}</span>
+                <span className="flex-1">
+                  <span className={c.supported ? "" : "text-danger"}>{c.sentence}</span>{" "}
+                  {c.supported && c.url
+                    ? <a href={c.url} target="_blank" rel="noreferrer" title={c.title ?? ""} className="text-accent hover:underline">[{new URL(c.url).hostname}]</a>
+                    : c.supported ? <span className="text-muted">[product description]</span> : <span className="text-danger">no evidence found</span>}
+                  <span className="ml-1 font-mono text-[10px] text-muted">{c.score.toFixed(2)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {m.review?.notes?.length ? <ul className="mt-2 space-y-0.5 text-danger">{m.review.notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}
       {m.sentAt && <div className="mt-2 text-muted">Sent {new Date(m.sentAt).toLocaleString()} · {m.deliveredTo === "manual:linkedin" ? "by rep on LinkedIn" : "to demo inbox"}</div>}
       {error && <div className="mt-2 text-danger">{error}</div>}

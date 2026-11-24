@@ -18,6 +18,7 @@ export function TopBar() {
           </Badge>
           {modes && <Badge tone={modes.band === "live" ? "violet" : "neutral"}>{modes.band === "live" ? "Band: live" : "Band: offline (local agents)"}</Badge>}
           {modes && <Badge>Graph: {modes.graph}</Badge>}
+          {modes && <Badge tone={modes.vendors.moss === "live" ? "green" : "neutral"} title="Evidence memory and claim checks">Moss: {modes.vendors.moss === "live" ? "live" : "mock"}</Badge>}
         </div>
         <div className="flex items-center gap-4 text-[12px]">
           <span className="text-muted">Tokens <span className="font-mono text-ink">{tokens.toLocaleString()}</span></span>

@@ -5,6 +5,8 @@ import { mutate, audit, agentEvent, emptyWorkspace } from "@/lib/db/store";
 import { route } from "@/lib/api/errors";
 import { newId } from "@/lib/ids";
 import { formatHandoff } from "@/lib/providers/band";
+import { syncEvidence } from "@/lib/pipeline/evidence";
+import { getWorkspace } from "@/lib/db/store";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,5 +30,6 @@ export const POST = route(async (req: Request) => {
     audit(ws, { actor: "rep", agent: "ui", action: "intake_submitted", target: ws.product.id, detail: product.name });
     return { icp: ws.icp, expansions: ws.expansions };
   });
+  await syncEvidence(getWorkspace());
   return NextResponse.json({ ...out, mode: res.mode });
 });

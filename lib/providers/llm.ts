@@ -3,7 +3,24 @@ import type { z } from "zod";
 import { env, isLive } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 
-export interface LlmResult<T> { data: T; tokens: number; costUsd: number; mode: "live" | "mock" }
+export interface LlmResult<T> { data: T; tokens: number; costUsd: number; mode: "live" | "mock"; provider?: "anthropic" | "moss" | "mock" }
+
+/** Which LLM runs: Claude when ANTHROPIC_API_KEY is set, otherwise Moss Inference when Moss keys are set, otherwise mock. */
+export function llmProvider(): "anthropic" | "moss" | "mock" {
+  if (!isLive("llm")) return "mock";
+  return env.anthropicKey ? "anthropic" : "moss";
+}
+
+async function mossComplete(system: string, prompt: string, maxTokens: number) {
+  const { MossInference } = await import("@moss-js/moss");
+  const client = new MossInference(env.mossProjectId!, env.mossProjectKey!);
+  const res = await client.responses.create(
+    { instructions: system, input: prompt, max_output_tokens: maxTokens, retrieve: false },
+    { timeout: 90_000 },
+  );
+  const usage = (res as unknown as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+  return { text: res.output_text ?? "", inTok: usage?.input_tokens ?? 0, outTok: usage?.output_tokens ?? 0 };
+}
 
 // Rough per-token pricing used only for the telemetry display.
 const USD_PER_INPUT_TOKEN = 3 / 1_000_000;
@@ -24,7 +41,16 @@ export async function completeJson<S extends z.ZodTypeAny>(opts: {
   if (!isLive("llm")) {
     const data = opts.schema.parse(opts.mock());
     const tokens = Math.round((opts.prompt.length + JSON.stringify(data).length) / 4);
-    return { data, tokens, costUsd: 0, mode: "mock" };
+    return { data, tokens, costUsd: 0, mode: "mock", provider: "mock" };
+  }
+
+  if (llmProvider() === "moss") {
+    let r;
+    try { r = await mossComplete(`${opts.system}\nRespond with a single JSON object only. No prose, no code fences.`, opts.prompt, opts.maxTokens ?? 4096); }
+    catch (e) { throw new ApiError("VENDOR_ERROR", `Moss inference ${opts.task} failed: ${(e as Error).message}`, { vendor: "moss" }); }
+    const parsed = opts.schema.safeParse(extractJson(r.text));
+    if (!parsed.success) throw new ApiError("VENDOR_ERROR", `Moss inference ${opts.task} returned invalid JSON`, { issues: parsed.error.issues.slice(0, 5) });
+    return { data: parsed.data, tokens: r.inTok + r.outTok, costUsd: 0, mode: "live", provider: "moss" };
   }
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {

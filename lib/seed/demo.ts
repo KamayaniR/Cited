@@ -63,6 +63,7 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
   }
 
   ws.competitors = DEMO_COMPETITORS.map((c, i) => ({ id: `cmp_${i}`, ...c, sourceUrl: `https://${c.domain}/` }));
+  for (const c of ws.competitors) ws.citations.push({ id: `cit_${c.id}`, entityType: "competitor", entityId: c.id, url: c.sourceUrl, title: `${c.name}: ${c.positioning}`, snippet: `${c.positioning}. Pricing: ${c.pricing}.`, fetchedAt: at(120) });
 
   // One lead per eligible company (first person), alternating A/B variants.
   ws.companies.filter((c) => !c.excluded).forEach((c, i) => {

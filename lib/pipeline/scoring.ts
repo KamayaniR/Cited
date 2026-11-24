@@ -37,7 +37,7 @@ const SIGNAL_POINTS: Record<Signal["type"], number> = {
 };
 
 /** Intent = signal points (each signal type counted once), +10 if a signal matches an ICP trigger, decayed by age. */
-export function intentScore(icp: Icp, signals: Pick<Signal, "type" | "summary" | "detectedAt">[], now = new Date()): number {
+export function intentScore(icp: Icp, signals: (Pick<Signal, "type" | "summary" | "detectedAt"> & { id?: string })[], now = new Date(), triggerMatch?: (s: { id?: string; summary: string }) => boolean): number {
   const seen = new Set<string>();
   let total = 0;
   for (const s of signals) {
@@ -45,8 +45,8 @@ export function intentScore(icp: Icp, signals: Pick<Signal, "type" | "summary" |
     seen.add(s.type);
     const ageDays = (now.getTime() - new Date(s.detectedAt).getTime()) / 86_400_000;
     const decay = ageDays <= 30 ? 1 : ageDays <= 90 ? 0.7 : 0.4;
-    const triggerMatch = icp.triggers.some((t) => overlap(t.signal, s.summary) >= 2) ? 10 : 0;
-    total += (SIGNAL_POINTS[s.type] + triggerMatch) * decay;
+    const matched = triggerMatch ? triggerMatch(s) : icp.triggers.some((t) => overlap(t.signal, s.summary) >= 2);
+    total += (SIGNAL_POINTS[s.type] + (matched ? 10 : 0)) * decay;
   }
   return Math.round(clamp(total));
 }

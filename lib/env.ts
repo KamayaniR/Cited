@@ -14,6 +14,9 @@ export const env = {
   flexpriceBaseUrl: process.env.FLEXPRICE_BASE_URL ?? "https://api.cloud.flexprice.io/v1",
   bandKey: process.env.BAND_API_KEY,
   bandRoomId: process.env.BAND_ROOM_ID,
+  mossProjectId: process.env.MOSS_PROJECT_ID,
+  mossProjectKey: process.env.MOSS_PROJECT_KEY,
+  mossIndex: process.env.MOSS_INDEX ?? "cited-evidence",
   neo4jUri: process.env.NEO4J_URI,
   neo4jUser: process.env.NEO4J_USER ?? "neo4j",
   neo4jPassword: process.env.NEO4J_PASSWORD,
@@ -27,13 +30,13 @@ export const env = {
 
 export type Vendor =
   | "llm" | "tavily" | "hunter" | "apollo" | "sendgrid"
-  | "flexprice" | "band" | "neo4j" | "supabase";
+  | "flexprice" | "band" | "neo4j" | "supabase" | "moss";
 
 /** True when the vendor has the keys it needs and mock mode is not forced. */
 export function isLive(v: Vendor): boolean {
   if (env.forceMock) return false;
   switch (v) {
-    case "llm": return Boolean(env.anthropicKey);
+    case "llm": return Boolean(env.anthropicKey) || Boolean(env.mossProjectId && env.mossProjectKey);
     case "tavily": return Boolean(env.tavilyKey);
     case "hunter": return Boolean(env.hunterKey);
     case "apollo": return Boolean(env.apolloKey);
@@ -42,10 +45,11 @@ export function isLive(v: Vendor): boolean {
     case "band": return Boolean(env.bandKey && env.bandRoomId);
     case "neo4j": return Boolean(env.neo4jUri && env.neo4jPassword);
     case "supabase": return Boolean(env.supabaseUrl && env.supabaseServiceKey);
+    case "moss": return Boolean(env.mossProjectId && env.mossProjectKey);
   }
 }
 
-export const VENDORS: Vendor[] = ["llm", "tavily", "hunter", "apollo", "sendgrid", "flexprice", "band", "neo4j", "supabase"];
+export const VENDORS: Vendor[] = ["llm", "tavily", "hunter", "apollo", "sendgrid", "flexprice", "band", "neo4j", "supabase", "moss"];
 
 export function vendorModes(): Record<Vendor, "live" | "mock"> {
   return Object.fromEntries(VENDORS.map((v) => [v, isLive(v) ? "live" : "mock"])) as Record<Vendor, "live" | "mock">;

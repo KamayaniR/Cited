@@ -5,6 +5,18 @@ import { findMessage, assertReviewable, applyEdit, markSent, reject } from "@/li
 import { requireCredits, charge } from "@/lib/pipeline/credits";
 import { sendEmail } from "@/lib/providers/sendgrid";
 import { ApiError, route } from "@/lib/api/errors";
+import { claimCheck } from "@/lib/pipeline/evidence";
+import type { Message } from "@/lib/types";
+
+/** Re-run the Moss claim check on the text the rep is about to approve or save. */
+async function recheck(m: Message, edited?: { subject?: string | null; body?: string }) {
+  const ws = getWorkspace();
+  const lead = ws.leads.find((l) => l.id === m.leadId)!;
+  const company = ws.companies.find((c) => c.id === lead.companyId)!;
+  const subject = edited?.subject !== undefined ? edited.subject : m.subject;
+  const body = edited?.body ?? m.body;
+  return claimCheck(`${subject ?? ""}\n${body}`, { companyId: company.id, companyName: company.name, productName: ws.product?.name ?? "" });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +42,24 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ id: stri
     return NextResponse.json(out);
   }
   if (body.decision === "edit") {
+    const cc = await recheck(m0, body.edited);
     const out = mutate((ws) => {
       const { message, lead } = findMessage(ws, id);
       applyEdit(message, body.edited);
+      message.review = { ...(message.review ?? {}), grounding: { claims: cc.claims, ms: cc.ms, engine: cc.engine } };
       audit(ws, { actor: "rep", agent: "ui", action: "message_edited", target: id, detail: "" });
       return { message, lead };
     });
     return NextResponse.json(out);
   }
 
-  // approve
-  if (m0.status === "needs_fix") throw new ApiError("INVALID_STATE", "Message failed review or security checks; edit it first");
+  // approve: nothing goes out with a claim Moss can't find evidence for.
+  const cc = await recheck(m0, body.edited);
+  if (cc.unsupported.length) {
+    mutate((ws) => { const { message } = findMessage(ws, id); message.review = { ...(message.review ?? {}), grounding: { claims: cc.claims, ms: cc.ms, engine: cc.engine } }; });
+    throw new ApiError("UNCITED_CLAIM", `No evidence for: "${cc.unsupported[0]}"`, { unsupported: cc.unsupported });
+  }
+  if (m0.status === "needs_fix" && !body.edited) throw new ApiError("INVALID_STATE", "Message failed review or security checks; edit it first");
   if (m0.channel === "linkedin") {
     const out = mutate((ws) => {
       const { message, lead } = findMessage(ws, id);

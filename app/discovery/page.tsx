@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 
 const EMAIL_TONE = { valid: "green", accept_all: "amber", invalid: "red", unknown: "neutral" } as const;
 
-type RunResult = { queries: string[]; companies: unknown[]; filtered: unknown[]; dropped: { name: string; reason: string }[]; mode: string };
+type RunResult = { moss?: { indexed: number; triggerMatches: number; ms: number }; queries: string[]; companies: unknown[]; filtered: unknown[]; dropped: { name: string; reason: string }[]; mode: string };
 
 function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
   const { ws, refresh } = useWorkspace();
@@ -62,6 +62,7 @@ export default function DiscoveryPage() {
       {last && (
         <Card className="mb-4 p-3 text-[12px]">
           <div><span className="font-semibold">{last.companies.length}</span> cited companies, <span className="font-semibold">{last.filtered.length}</span> filtered, <span className="font-semibold">{last.dropped.length}</span> dropped for missing citations · {last.mode} mode</div>
+          {last.moss && <div className="mt-1 text-muted">Moss indexed {last.moss.indexed} evidence docs and matched {last.moss.triggerMatches} signals to ICP triggers by meaning in {last.moss.ms.toFixed(1)} ms</div>}
           {last.dropped.map((d) => <div key={d.name} className="mt-1 text-danger">Dropped {d.name}: {d.reason}</div>)}
           <details className="mt-1 text-muted"><summary className="cursor-pointer">{last.queries.length} search queries</summary>{last.queries.map((q) => <div key={q} className="font-mono text-[11px]">{q}</div>)}</details>
         </Card>

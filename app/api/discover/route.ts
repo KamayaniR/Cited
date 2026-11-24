@@ -3,6 +3,8 @@ import { getWorkspace, mutate, audit, agentEvent } from "@/lib/db/store";
 import { runDiscovery, MAX_QUERIES } from "@/lib/pipeline/discovery";
 import { ApiError, route } from "@/lib/api/errors";
 import { formatHandoff } from "@/lib/providers/band";
+import { syncEvidence, matchTriggers } from "@/lib/pipeline/evidence";
+import { intentScore, combineScore, tierFor } from "@/lib/pipeline/scoring";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -31,7 +33,23 @@ export const POST = route(async () => {
     audit(ws, { actor: "agent", agent: "builder", action: "discovery_run", target: ws.icp!.id, detail: `${out.companies.length} companies, ${out.signals.length} signals` });
   });
 
+  // Moss: index every cited page as evidence, then re-score intent with semantic trigger matching.
+  const indexed = await syncEvidence(getWorkspace());
+  const tm = await matchTriggers(ws0.icp.data.triggers.map((t) => t.signal));
+  mutate((ws) => {
+    for (const c of ws.companies) {
+      const sigs = ws.signals.filter((s) => s.companyId === c.id);
+      c.intentScore = intentScore(ws.icp!.data, sigs, new Date(), (s) => Boolean(s.id && tm.matches.has(s.id)));
+      c.score = combineScore(c.fitScore, c.intentScore);
+      c.tier = tierFor(c.score);
+    }
+    agentEvent(ws, { from: "builder", to: "planner", kind: "result", text: `Moss: indexed ${indexed.count} evidence docs (${indexed.mode}); ${tm.matches.size} signals matched ICP triggers semantically in ${tm.ms.toFixed(1)} ms` });
+  });
+  const final = getWorkspace();
+  out.companies = final.companies;
+
   return NextResponse.json({
+    moss: { indexed: indexed.count, triggerMatches: tm.matches.size, ms: tm.ms },
     companies: out.companies.filter((c) => !c.excluded),
     filtered: out.companies.filter((c) => c.excluded),
     competitors: out.competitors,

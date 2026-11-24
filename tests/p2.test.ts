@@ -9,6 +9,8 @@ import { runDiscovery } from "@/lib/pipeline/discovery";
 import { emptyWorkspace } from "@/lib/db/store";
 import { DEMO_ICP, DEMO_PRODUCT } from "@/lib/seed/fixtures";
 import type { Company, Workspace } from "@/lib/types";
+import { syncEvidence } from "@/lib/pipeline/evidence";
+import { resetMockIndex } from "@/lib/providers/moss";
 
 const co = (domain: string, name = domain): Company => ({ id: `co_${domain}`, name, domain, domainSource: "tavily", industry: "x", naics: "513210", headcount: 500, region: "United States", hq: null, hqSource: null, fitScore: 80, intentScore: 80, score: 80, tier: "A", excluded: false, excludeReason: null, signalsRefreshedAt: "" });
 
@@ -74,6 +76,8 @@ async function pipelineWs(): Promise<Workspace> {
     const lead = applyEnrichment(ws, c, r);
     if (lead) charge(ws, "lead_enriched", lead.id);
   }
+  resetMockIndex();
+  await syncEvidence(ws);
   return ws;
 }
 

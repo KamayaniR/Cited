@@ -80,7 +80,8 @@ export interface LeadEvent { id: string; leadId: string; fromStage: Stage | null
 export interface Message {
   id: string; leadId: string; personId: string; channel: z.infer<typeof ChannelEnum>; step: 1 | 2 | 3; dayOffset: number;
   variant: "A" | "B"; valueProp: string; subject: string | null; body: string; signalIds: string[];
-  status: z.infer<typeof MessageStatusEnum>; review: { reviewer?: string; security?: string; notes?: string[] } | null;
+  status: z.infer<typeof MessageStatusEnum>;
+  review: { reviewer?: string; security?: string; notes?: string[]; grounding?: { claims: { sentence: string; supported: boolean; score: number; evidenceId: string | null; url: string | null; title: string | null }[]; ms: number; engine: string } } | null;
   editedByRep: boolean; sentAt: string | null; deliveredTo: "sendgrid" | "demo" | "manual:linkedin" | null;
 }
 export interface AuditEntry { id: string; actor: Actor; agent: string | null; action: string; target: string; detail: string; at: string }

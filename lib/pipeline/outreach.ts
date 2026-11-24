@@ -7,6 +7,7 @@ import { hostOf } from "./citations";
 import type { Workspace, Lead, Message, Signal, ProductInput, Company, Person } from "@/lib/types";
 import { newId } from "@/lib/ids";
 import { BUZZWORDS, wordLimit } from "@/lib/agents/rules";
+import { claimCheck, evidenceForCompany, type ClaimCheck } from "./evidence";
 
 /** Sequence shape: touch 1 email (day 0), touch 2 LinkedIn (day 2, sent by hand), touch 3 email (day 5). */
 export const SEQUENCE = [
@@ -28,7 +29,7 @@ const DraftSchema = z.object({
 });
 type Draft = z.infer<typeof DraftSchema>["messages"][number];
 
-interface Ctx { product: ProductInput; company: Company; person: Person; signals: Signal[]; variant: "A" | "B"; sender: string }
+interface Ctx { product: ProductInput; company: Company; person: Person; signals: Signal[]; variant: "A" | "B"; sender: string; evidence: { id: string; text: string; url: string }[] }
 
 const firstSentence = (s: string) => (s.split(/(?<=\.)\s/)[0] ?? s).replace(/\.$/, "");
 const lcFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -62,6 +63,10 @@ function mockDraft(c: Ctx): Draft[] {
 /** Mock "builder fix": applies the reviewer's mechanical fixes so the loop is visible in mock mode. */
 function mockFix(d: Draft, fixes: string[], limit: number): Draft {
   let body = d.body.replace(/\s*[—–]\s*/g, ", ");
+  for (const f of fixes) {
+    const m = f.match(/unsupported claim "(.+)"$/);
+    if (m) body = body.replace(m[1], "").replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n");
+  }
   for (const b of BUZZWORDS) body = body.replace(new RegExp(`\\b${b}\\b`, "gi"), "");
   if (fixes.some((f) => f.includes("words"))) body = body.split(/\s+/).slice(0, limit).join(" ");
   return { ...d, body, subject: d.subject?.replace(/[—–]/g, ",") ?? null };
@@ -74,18 +79,19 @@ async function draft(c: Ctx, fixes: string[] = [], previous?: Draft[]) {
     system: `You write B2B outreach for a founder. Plain, specific, human.
 Rules:
 - 3 messages: step 1 email (day 0), step 2 LinkedIn connection note (day 2, max 60 words, no subject), step 3 email (day 5).
-- Step 1 must reference exactly one of the provided signals and put its id in signalIds. Never invent facts beyond the signals and product.
+- Step 1 must reference exactly one of the provided signals and put its id in signalIds.
+- Every specific claim (names, numbers, events) must come from the Evidence list or the product description. Never invent facts; a claim checker rejects anything it can't find.
 - Email bodies max ${limit} words. One call to action (one question) per message.
 - No em dashes or en dashes. No buzzwords (${BUZZWORDS.slice(0, 8).join(", ")}...). No links.
 - Angle (variant ${c.variant}): ${VALUE_PROPS[c.variant]}.
 - Sign as ${c.sender}.`,
-    prompt: `Product: ${JSON.stringify(c.product)}\nCompany: ${c.company.name} (${c.company.industry}, ${c.company.headcount} employees)\nRecipient: ${c.person.name}, ${c.person.title}\nSignals: ${JSON.stringify(c.signals.filter((s) => s.type !== "negative").map((s) => ({ id: s.id, type: s.type, summary: s.summary })))}\n${fixes.length ? `\nPrevious draft:\n${JSON.stringify(previous)}\nFix these reviewer findings:\n- ${fixes.join("\n- ")}\n` : ""}\nReturn {"messages":[{"step":1,"channel":"email","subject":"","body":"","signalIds":[]}, ...]}`,
+    prompt: `Product: ${JSON.stringify(c.product)}\nCompany: ${c.company.name} (${c.company.industry}, ${c.company.headcount} employees)\nRecipient: ${c.person.name}, ${c.person.title}\nSignals: ${JSON.stringify(c.signals.filter((s) => s.type !== "negative").map((s) => ({ id: s.id, type: s.type, summary: s.summary })))}\nEvidence (retrieved from Moss): ${JSON.stringify(c.evidence)}\n${fixes.length ? `\nPrevious draft:\n${JSON.stringify(previous)}\nFix these reviewer findings:\n- ${fixes.join("\n- ")}\n` : ""}\nReturn {"messages":[{"step":1,"channel":"email","subject":"","body":"","signalIds":[]}, ...]}`,
     schema: DraftSchema,
     mock: () => ({ messages: fixes.length && previous ? previous.map((d) => mockFix(d, fixes.filter((f) => f.startsWith(`s${d.step}:`)), d.channel === "linkedin" ? 60 : limit)) : mockDraft(c) }),
   });
 }
 
-export interface SequenceResult { messages: Message[]; rounds: number; fixes: string[][]; blocks: string[]; tokens: number; costUsd: number }
+export interface SequenceResult { messages: Message[]; rounds: number; fixes: string[][]; blocks: string[]; tokens: number; costUsd: number; evidence: { count: number; ms: number; engine: string }; claimMs: number }
 
 /** Builder drafts → Reviewer (fix loop, max 2) → Security. Messages end pending_approval, or needs_fix when escalated/blocked. */
 export async function buildSequence(ws: Workspace, lead: Lead): Promise<SequenceResult> {
@@ -93,15 +99,34 @@ export async function buildSequence(ws: Workspace, lead: Lead): Promise<Sequence
   const person = ws.people.find((p) => p.id === lead.personId)!;
   const signals = ws.signals.filter((s) => s.companyId === company.id);
   const sender = (ws.product?.teamBackground.match(/^(?:co-?founder\s+)?([A-Z][a-z]+)/i)?.[1]) ?? `The ${ws.product!.name} team`;
-  const ctx: Ctx = { product: ws.product!, company, person, signals, variant: lead.variant, sender: /^(co|the)$/i.test(sender) ? `The ${ws.product!.name} team` : sender };
+  // Ground the draft: pull this company's strongest evidence from Moss for the ICP triggers and persona.
+  const evQuery = `${person.title} ${ws.icp?.data.triggers.map((t) => t.signal).join(" ") ?? ""}`;
+  const ev = await evidenceForCompany(company, evQuery, 5);
+  const ctx: Ctx = {
+    product: ws.product!, company, person, signals, variant: lead.variant,
+    sender: /^(co|the)$/i.test(sender) ? `The ${ws.product!.name} team` : sender,
+    evidence: ev.hits.map((h) => ({ id: h.id, text: h.text, url: h.metadata.url })),
+  };
   const signalIds = new Set(signals.map((s) => s.id));
+  const claimCtx = { companyId: company.id, companyName: company.name, productName: ws.product!.name };
+  const checks = new Map<number, ClaimCheck>();
+  let claimMs = 0;
 
   let tokens = 0, costUsd = 0;
   let res = await draft(ctx);
   tokens += res.tokens; costUsd += res.costUsd;
   let drafts = res.data.messages;
-  const review = (ds: Draft[]) => ds.flatMap((d) => reviewMessage({ id: `s${d.step}`, ...d }, { seniority: person.seniority, signalIds }));
-  let fixes = review(drafts);
+  const review = async (ds: Draft[]) => {
+    const out: string[] = [];
+    for (const d of ds) {
+      out.push(...reviewMessage({ id: `s${d.step}`, ...d }, { seniority: person.seniority, signalIds }));
+      const cc = await claimCheck(`${d.subject ?? ""}\n${d.body}`, claimCtx);
+      checks.set(d.step, cc); claimMs += cc.ms;
+      out.push(...cc.unsupported.map((u) => `s${d.step}: unsupported claim "${u}"`));
+    }
+    return out;
+  };
+  let fixes = await review(drafts);
   const fixLog: string[][] = [fixes];
   let rounds = 0;
   while (fixes.length && rounds < MAX_FIX_ROUNDS) {
@@ -109,7 +134,7 @@ export async function buildSequence(ws: Workspace, lead: Lead): Promise<Sequence
     res = await draft(ctx, fixes, drafts);
     tokens += res.tokens; costUsd += res.costUsd;
     drafts = res.data.messages;
-    fixes = review(drafts);
+    fixes = await review(drafts);
     fixLog.push(fixes);
   }
 
@@ -125,13 +150,13 @@ export async function buildSequence(ws: Workspace, lead: Lead): Promise<Sequence
       variant: lead.variant, valueProp: VALUE_PROPS[lead.variant], subject: seq.channel === "email" ? d.subject : null, body: d.body,
       signalIds: d.signalIds.filter((id) => signalIds.has(id)),
       status: myFixes.length || myBlocks.length ? "needs_fix" : "pending_approval",
-      review: { reviewer: myFixes.length ? "fail" : "pass", security: myBlocks.length ? "block" : "pass", notes: [...myFixes, ...myBlocks] },
+      review: { reviewer: myFixes.length ? "fail" : "pass", security: myBlocks.length ? "block" : "pass", notes: [...myFixes, ...myBlocks], grounding: checks.get(d.step) },
       editedByRep: false, sentAt: null, deliveredTo: null,
     };
   });
   // Unknown email keeps the lead out of email touches; no LinkedIn URL means no LinkedIn touch.
   const reachable = messages.filter((m) => (m.channel === "email" ? Boolean(person.email) : Boolean(person.linkedinUrl)));
-  return { messages: reachable, rounds, fixes: fixLog, blocks, tokens, costUsd };
+  return { messages: reachable, rounds, fixes: fixLog, blocks, tokens, costUsd, evidence: { count: ev.hits.length, ms: ev.ms, engine: ev.engine }, claimMs };
 }
 
 /** Leads ready for drafting: Matched, no messages yet, and a reachable channel. */

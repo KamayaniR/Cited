@@ -4,6 +4,7 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Badge, Button, Card, PageTitle, TierBadge } from "@/components/ui";
 import { MessageCard } from "@/components/MessageCard";
 import { api } from "@/components/api";
+import { EvidenceSearch } from "@/components/EvidenceSearch";
 
 const FILTERS = [
   { key: "open", label: "Needs review", match: (s: string) => s === "pending_approval" || s === "needs_fix" },
@@ -60,6 +61,7 @@ export default function OutreachPage() {
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
               {ms!.sort((a, b) => a.step - b.step).map((m) => <MessageCard key={m.id} m={m} person={person} signals={signals} refresh={refresh} />)}
             </div>
+            <EvidenceSearch companyId={company.id} companyName={company.name} />
           </Card>
         );
       })}
