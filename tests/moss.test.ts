@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { indexEvidence, searchEvidence, resetMockIndex } from "@/lib/providers/moss";
-import { claimCheck, sentences, isSpecificClaim, evidenceDocs, matchTriggers } from "@/lib/pipeline/evidence";
+import { claimCheck, sentences, isSpecificClaim, hardFacts, evidenceDocs, matchTriggers } from "@/lib/pipeline/evidence";
 import { buildDemoWorkspace } from "@/lib/seed/demo";
 import { buildSequence } from "@/lib/pipeline/outreach";
 
@@ -36,6 +36,12 @@ describe("claim check", () => {
     expect(ok.unsupported).toEqual([]);
     const bad = await claimCheck("Congrats on Northwind Analytics' IPO on the Nasdaq last week.", ctx);
     expect(bad.unsupported.length).toBe(1);
+  });
+  it("flags a wrong funding round or amount even when the evidence is similar", async () => {
+    expect((await claimCheck("Congrats on closing your Series D.", ctx)).unsupported.length).toBe(1);
+    expect((await claimCheck("Congrats on Northwind Analytics' $60M Series C.", ctx)).unsupported.length).toBe(1);
+    expect((await claimCheck("Congrats on Northwind Analytics' $45M Series C.", ctx)).unsupported).toEqual([]);
+    expect(hardFacts("Raised $45 million in a Series C in 2025, up 30%")).toEqual(["series c", "$45m", "30%", "2025"]);
   });
   it("accepts claims about our own product", async () => {
     const r = await claimCheck("Ledgerlight reconciles bank feeds and drafts journal entries inside NetSuite.", ctx);

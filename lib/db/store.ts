@@ -1,4 +1,5 @@
 import "server-only";
+import { AUDIT_TO_FUNNEL, track } from "@/lib/monitor";
 import fs from "fs";
 import path from "path";
 import type { Workspace, AuditEntry, AgentEvent, Actor, AgentRole } from "@/lib/types";
@@ -61,6 +62,8 @@ export function replaceWorkspace(next: Workspace) {
 export function audit(ws: Workspace, e: { actor: Actor; agent?: string | null; action: string; target: string; detail?: string }): AuditEntry {
   const entry: AuditEntry = { id: newId("aud"), actor: e.actor, agent: e.agent ?? null, action: e.action, target: e.target, detail: e.detail ?? "", at: nowIso() };
   ws.auditLog.unshift(entry);
+  const funnel = AUDIT_TO_FUNNEL[e.action];
+  if (funnel) track(funnel, ws.org.id, { actor: e.actor, target: e.target });
   return entry;
 }
 

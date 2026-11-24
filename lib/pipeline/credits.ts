@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "@/lib/monitor";
 import type { Workspace } from "@/lib/types";
 import { CREDIT_PRICES, ingestEvent, roundCredits, type MeteredEvent } from "@/lib/providers/flexprice";
 import { ApiError } from "@/lib/api/errors";
@@ -18,6 +19,7 @@ export function charge(ws: Workspace, event: MeteredEvent, leadId: string | null
   ws.org.creditsBalance = roundCredits(ws.org.creditsBalance - credits);
   const row = { id: newId("use"), eventName: event, quantity, credits, leadId, flexpriceSynced: false, at: nowIso() };
   ws.usageEvents.unshift(row);
+  if (event === "lead_enriched") track("lead_enriched", ws.org.id, { lead_id: leadId ?? "" });
   void ingestEvent({ eventId: row.id, eventName: event, quantity, customerId: ws.org.id, timestamp: row.at, properties: { lead_id: leadId ?? "" } }).then((r) => { row.flexpriceSynced = r.synced; });
   return row;
 }

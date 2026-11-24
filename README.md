@@ -70,6 +70,8 @@ Every vendor sits behind an adapter with a mock fallback, so the whole app runs 
 | `BAND_API_URL`, `BAND_WAKEUP_SECRET` | Band API base, webhook secret | band.ai |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Graph | Neo4j Aura Free |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Database | supabase.com |
+| `SENTRY_DSN` | Error monitoring | sentry.io → Project → Client Keys |
+| `POSTHOG_KEY`, `POSTHOG_HOST` | Funnel analytics | posthog.com → Project settings |
 | `CRON_SECRET` | Scheduled refresh | Any random string |
 
 Database: `supabase db push` applies `supabase/migrations/`. The Neo4j schema in `lib/graph/schema.cypher` runs on startup.
@@ -84,19 +86,41 @@ Database: `supabase db push` applies `supabase/migrations/`. The Neo4j schema in
 - Graph schema changes proposed by agents are limited to `CREATE CONSTRAINT|INDEX … IF NOT EXISTS` and wait for a human.
 - Keys live only in `.env.local`, which is gitignored.
 
-## Tests
+## Tests and CI
 
 ```bash
-npm test            # vitest: 76 tests, one file per build stage plus Moss
+npm test            # vitest: 85 tests, one file per build stage plus Moss
+npm run coverage    # same, with coverage of lib/ (fails under 80% lines; currently about 88%)
+npm run e2e         # build, then Playwright walks the full pipeline in mock mode
 npm run typecheck
 npm run lint
 ```
 
-Vendor APIs that need keys (Flexprice, Band) are tested against stubbed HTTP that follows their public docs.
+Vendor APIs that need keys (Flexprice, Band, Sentry, PostHog) are tested against stubbed HTTP that follows their public docs.
+
+The E2E run drives the UI from intake to ICP approval, discovery (every company must cite a URL), enrichment (credits drop), drafting, one human approval sent to the demo inbox, and the Kanban. A second test adds an unsupported "Series D" claim and checks it is blocked, then drains credits and checks for 402.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs three jobs:
+
+- lint, typecheck, tests with coverage, and build;
+- Snyk Open Source and Snyk Code, failing on high severity (set the `SNYK_TOKEN` repository secret), plus `npm audit --audit-level=high`;
+- the Playwright E2E with every vendor mocked and sending off.
+
+## Monitoring
+
+| Tool | Tracks | Without keys |
+|---|---|---|
+| Sentry (`SENTRY_DSN`) | Unhandled API errors and vendor failures (5xx, 401/403, 429, network) | Server log |
+| PostHog (`POSTHOG_KEY`) | Funnel: `intake_done`, `icp_approved`, `lead_enriched`, `message_approved`, `stage_changed` | Counts in memory |
+| `/api/health` | Vendor modes, per-vendor call and error counts, funnel counts, active alerts | Always on |
+| Audit log | Every outbound action (source of truth) | Always on |
+
+Alerts fire, and go to Sentry when it is set, when a vendor's error rate passes 10% (at least 5 calls), when 5 or more 402 responses arrive within 10 minutes, and on any attempt to send a message that was not approved. That last one is also a hard block in `markSent`.
 
 ## Project structure
 
 ```
+e2e/                 Playwright end-to-end tests
 app/                 pages (intake, discovery, graph, outreach, pipeline, analytics, billing, audit) and API routes
 components/          UI, approval cards, refresh button
 lib/
@@ -107,6 +131,7 @@ lib/
   graph/             model, queries (Cypher + in-memory), neo4j sync, schema.cypher
   seed/              demo fixtures (fictional .example companies)
   db/                workspace store
+  monitor.ts         Sentry, PostHog, alert counters
 supabase/migrations/
 docs/                system design, viability slide, demo script
 tests/
@@ -126,7 +151,7 @@ vercel.json          cron schedule
 | P5 | Flexprice metering and credit gate | Done (mock until FLEXPRICE_API_KEY is set) |
 | P6 | Band agents and approval cards | Done (local agents until Band keys are set) |
 | P7 | Pitch slide, system design, demo script | Done (video to be recorded) |
-| P8 | Snyk, E2E, monitoring | Next |
+| P8 | Snyk in CI, Playwright E2E, 80% coverage, Sentry and PostHog | Done (Snyk runs once `SNYK_TOKEN` is set) |
 
 ## License
 

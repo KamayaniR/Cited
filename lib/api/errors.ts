@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { captureError, record402 } from "@/lib/monitor";
 
 export type ErrorCode =
   | "VALIDATION_ERROR" | "UNAUTHORIZED" | "CREDIT_LIMIT" | "NOT_FOUND"
@@ -19,12 +20,14 @@ export class ApiError extends Error {
 /** Single error shape for every route: { error: { code, message, details } } */
 export function errorResponse(err: unknown) {
   if (err instanceof ApiError) {
+    if (err.code === "CREDIT_LIMIT") record402();
+    if (err.code === "VENDOR_ERROR") captureError(err, { code: err.code, ...err.details });
     return NextResponse.json({ error: { code: err.code, message: err.message, details: err.details }, ...err.extra }, { status: STATUS[err.code] });
   }
   if (err instanceof ZodError) {
     return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Invalid request", details: { issues: err.issues } } }, { status: 400 });
   }
-  console.error("[api] unhandled", err instanceof Error ? err.message : err);
+  captureError(err, { unhandled: true });
   return NextResponse.json({ error: { code: "VENDOR_ERROR", message: "Unexpected server error", details: {} } }, { status: 502 });
 }
 

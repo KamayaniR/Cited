@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorFetch } from "@/lib/monitor";
 import { env, isLive } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 import { MOCK_SEARCH_RESULTS } from "@/lib/seed/fixtures";
@@ -19,7 +20,7 @@ export async function search(query: string, opts: { maxResults?: number; include
     const scoped = opts.includeDomains ? MOCK_SEARCH_RESULTS.filter((r) => opts.includeDomains!.some((d) => r.url.includes(d))) : (hits.length ? hits : MOCK_SEARCH_RESULTS);
     return { results: scoped.slice(0, opts.maxResults ?? 8), mode: "mock" };
   }
-  const res = await fetch("https://api.tavily.com/search", {
+  const res = await vendorFetch("tavily", "https://api.tavily.com/search", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${env.tavilyKey}` },
     body: JSON.stringify({ query, max_results: opts.maxResults ?? 8, search_depth: "advanced", ...(opts.includeDomains ? { include_domains: opts.includeDomains } : {}) }),

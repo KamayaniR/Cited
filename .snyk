@@ -1,0 +1,8 @@
+# Snyk policy. Exclude generated output and test fixtures from Snyk Code.
+version: v1.25.0
+exclude:
+  global:
+    - .next/**
+    - coverage/**
+    - playwright-report/**
+    - test-results/**

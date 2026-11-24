@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorFetch } from "@/lib/monitor";
 import { env, isLive } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 
@@ -17,7 +18,7 @@ export async function sendEmail(msg: { to: string; subject: string; body: string
   if (!isLive("sendgrid") || !env.sendingEnabled || !env.demoRecipient) {
     return { deliveredTo: "demo", to, simulated: true };
   }
-  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+  const res = await vendorFetch("sendgrid", "https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${env.sendgridKey}` },
     body: JSON.stringify({

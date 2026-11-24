@@ -73,15 +73,42 @@ export function isSpecificClaim(s: string, names: string[]): boolean {
   return words.some((w) => /^[A-Z][a-zA-Z]{2,}/.test(w) && !/^(I|I'm|I've)$/.test(w));
 }
 
+/**
+ * Hard facts that similarity search can't tell apart: funding rounds, money amounts, percentages and
+ * years. Plain counts ("a 20 minute call") are left to the similarity check.
+ */
+export function hardFacts(s: string): string[] {
+  const out = new Set<string>();
+  for (const m of s.matchAll(/\bseries\s+([a-h])\b/gi)) out.add(`series ${m[1].toLowerCase()}`);
+  for (const m of s.matchAll(/\b(ipo|seed round|pre-seed)\b/gi)) out.add(m[1].toLowerCase());
+  for (const m of s.matchAll(/[$€£]\s?\d[\d,.]*\s?(?:[mkb]n?|million|billion)?\b/gi)) out.add(normMoney(m[0]));
+  for (const m of s.matchAll(/\b\d+(?:\.\d+)?\s?%/g)) out.add(m[0].replace(/\s/g, ""));
+  for (const m of s.matchAll(/\b(19|20)\d{2}\b/g)) out.add(m[0]);
+  return [...out];
+}
+
+function normMoney(x: string) {
+  return x.toLowerCase().replace(/[\s,]/g, "").replace(/million$/, "m").replace(/billion$/, "b").replace(/bn$/, "b");
+}
+
+export function factsIn(facts: string[], evidence: string): boolean {
+  if (!facts.length) return true;
+  const have = new Set(hardFacts(evidence));
+  return facts.every((f) => have.has(f));
+}
+
 /** @reviewer's claim check: every specific claim must match evidence for this company (or our own product docs). */
 export async function claimCheck(text: string, ctx: { companyId: string; companyName: string; productName: string }): Promise<ClaimCheck> {
   const claims: Grounding[] = [];
   let ms = 0, engine = "moss";
   for (const s of sentences(text).filter((x) => isSpecificClaim(x, [ctx.companyName, ctx.productName]))) {
-    const r = await searchEvidence(s, { companyId: ctx.companyId, includeSelf: true, topK: 1 });
+    const r = await searchEvidence(s, { companyId: ctx.companyId, includeSelf: true, topK: 3 });
     ms += r.ms; engine = r.engine;
-    const top = r.hits[0];
-    const supported = Boolean(top && top.score >= SUPPORT_THRESHOLD);
+    // Similar is not the same: "Series D" scores close to evidence about a Series C. The best hit
+    // above the threshold must also contain every hard fact in the sentence.
+    const facts = hardFacts(s);
+    const top = r.hits.find((h) => h.score >= SUPPORT_THRESHOLD && factsIn(facts, h.text)) ?? r.hits[0];
+    const supported = Boolean(top && top.score >= SUPPORT_THRESHOLD && factsIn(facts, top.text));
     claims.push({ sentence: s, supported, score: Number((top?.score ?? 0).toFixed(2)), evidenceId: top?.id ?? null, url: top?.metadata.url || null, title: top?.metadata.title ?? null });
   }
   return { claims, unsupported: claims.filter((c) => !c.supported).map((c) => c.sentence), ms: Number(ms.toFixed(2)), engine };

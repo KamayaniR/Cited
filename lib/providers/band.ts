@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorFetch } from "@/lib/monitor";
 import crypto from "crypto";
 import { env, isLive } from "@/lib/env";
 import type { AgentEvent, AgentRole } from "@/lib/types";
@@ -80,7 +81,7 @@ const status = { posted: 0, failed: 0, lastError: null as string | null, lastPol
 export function bandStatus() { return { mode: bandMode(), room: env.bandRoomId ?? null, ...status }; }
 
 async function call<T>(key: string, method: string, path: string, body?: unknown): Promise<{ status: number; data: T | null }> {
-  const res = await fetch(`${env.bandApiUrl}${path}`, {
+  const res = await vendorFetch("band", `${env.bandApiUrl}${path}`, {
     method,
     headers: { "content-type": "application/json", "x-api-key": key },
     body: body ? JSON.stringify(body) : undefined,

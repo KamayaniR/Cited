@@ -222,15 +222,19 @@ Plans: Free (100 credits once), Founder $99/month (1,500), Team $399/month (7,50
 
 - **What is indexed.** Every page search returned (company pages, signal sources, competitor pages), each company's firmographics, and our own product description and team, as one Moss index (`cited-evidence`) with metadata `companyId`, `entityType`, `entityId`, `url`, `title`. Product docs use `companyId: "self"` (`lib/pipeline/evidence.ts`).
 - **Scoping.** Searches filter to one company plus `self`, so evidence about one prospect never supports a claim about another.
-- **Claim check.** Messages are split into sentences; only specific claims (names, numbers, events) are checked. A sentence is supported when the best hit scores at least 0.45; the UI shows each claim, its source and the query time (single-digit milliseconds in-process).
+- **Claim check.** Messages are split into sentences; only specific claims (names, numbers, events) are checked. A sentence is supported when a hit scores at least 0.45 and also contains every hard fact in the sentence (funding round, money amount, percentage, year), because similarity alone scores "Series D" close to evidence about a Series C. The UI shows each claim, its source and the query time (single-digit milliseconds in-process).
 - **Evidence search.** "Ask the evidence" in the approval queue returns a cited answer.
 - **Semantic triggers.** ICP triggers are matched to signals by meaning ("new head of data" matches "hired a VP of Analytics"), which adds intent points.
 - **Moss Inference** runs the LLM calls when no Anthropic key is set.
 - **Fallback.** If the Moss index can't be loaded, a local engine with the same API answers and the top bar says so.
 
-### Snyk
+### Snyk and CI
 
-Planned for P8: SAST and dependency scanning in CI, failing on high severity.
+GitHub Actions runs Snyk Open Source (dependencies) and Snyk Code (SAST) with `--severity-threshold=high` once the `SNYK_TOKEN` secret is set, plus `npm audit --audit-level=high` on every run. PostCSS is pinned to 8.5.33 through an npm override to clear a high-severity advisory in the copy bundled with Next.js 15. The other jobs are lint, typecheck, unit tests with an 80% line-coverage gate on `lib/` (about 88% today), build, and a Playwright E2E that walks the full pipeline in mock mode.
+
+### Monitoring
+
+`lib/monitor.ts` sends unhandled API errors and vendor failures to Sentry (envelope API, `SENTRY_DSN`) and the funnel events `intake_done`, `icp_approved`, `lead_enriched`, `message_approved` and `stage_changed` to PostHog (`POSTHOG_KEY`). Every vendor call goes through `vendorFetch`, which counts calls and failures (5xx, 401/403, 429, network). Alerts fire when a vendor's error rate passes 10% over at least 5 calls, when 5 or more 402s arrive within 10 minutes, and on any attempt to send a message that was not approved; `markSent` refuses that send outright. `/api/health` shows the counters and active alerts with no secrets. Without keys, errors go to the log and funnel counts stay in memory.
 
 ## 7. Data model
 
@@ -258,6 +262,7 @@ Every enriched field records the vendor that filled it (`tavily`, `hunter`, `apo
 - **Schema changes** proposed by agents are limited to `CREATE CONSTRAINT|INDEX ... IF NOT EXISTS` and need a human.
 - **Live data hygiene.** Demo companies use the reserved `.example` domain and are never searched live; live refresh keeps only results on the company's own site, naming its domain, or its full name, so a same-name company is not attached.
 - **PII.** Only business contact data from Hunter and Apollo; nothing is scraped behind a login.
+- **Last-line HITL check.** `markSent` refuses any message whose status is not `approved` and raises a `send_without_approval` alert.
 - **Planned:** Supabase auth with row-level security per org (the migration defines the tables; the app currently runs single-workspace).
 
 ## 9. Limitations and next steps

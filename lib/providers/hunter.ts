@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorFetch } from "@/lib/monitor";
 import { env, isLive } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 import { mockPersonContact, mockCompanyInfo, DEMO_COMPANIES } from "@/lib/seed/fixtures";
@@ -11,7 +12,7 @@ export interface HunterCompany { domain: string | null; hq: string | null; sourc
 
 async function get(path: string, params: Record<string, string>) {
   const qs = new URLSearchParams({ ...params, api_key: env.hunterKey! });
-  const res = await fetch(`${BASE}${path}?${qs}`);
+  const res = await vendorFetch("hunter", `${BASE}${path}?${qs}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new ApiError("VENDOR_ERROR", `Hunter ${path} failed: HTTP ${res.status}`, { vendor: "hunter" });
   return ((await res.json()) as { data: Record<string, unknown> }).data;

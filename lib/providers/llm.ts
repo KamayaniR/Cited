@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorFetch } from "@/lib/monitor";
 import type { z } from "zod";
 import { env, isLive } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
@@ -53,7 +54,7 @@ export async function completeJson<S extends z.ZodTypeAny>(opts: {
     return { data: parsed.data, tokens: r.inTok + r.outTok, costUsd: 0, mode: "live", provider: "moss" };
   }
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await vendorFetch("llm", "https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",

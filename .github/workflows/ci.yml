@@ -2,8 +2,17 @@ name: CI
 on:
   push: { branches: [main] }
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  test:
+    name: Lint, typecheck, unit tests with coverage, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,6 +21,48 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - name: Unit and integration tests (fails under 80% line coverage of lib/)
+        run: npm run coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: coverage, path: coverage/, retention-days: 7 }
       - run: npm run build
-# Snyk, Playwright and coverage are added in P8 (spec Section 11).
+
+  snyk:
+    name: Snyk (SAST + SCA, fail on high)
+    runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Skip notice
+        if: env.SNYK_TOKEN == ''
+        run: echo "::warning::SNYK_TOKEN is not set; add it under Settings > Secrets > Actions to enable Snyk."
+      - name: Snyk Open Source (dependencies)
+        if: env.SNYK_TOKEN != ''
+        run: npx --yes snyk@1 test --severity-threshold=high
+      - name: Snyk Code (SAST)
+        if: env.SNYK_TOKEN != ''
+        run: npx --yes snyk@1 code test --severity-threshold=high
+      - name: npm audit (high and critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  e2e:
+    name: Playwright E2E (full pipeline, mock mode)
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build and run E2E (all vendors mocked, sending off)
+        run: npm run e2e
+        env: { CI: "true", CITED_FORCE_MOCK: "true", SENDING_ENABLED: "false" }
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: playwright-report/, retention-days: 7 }

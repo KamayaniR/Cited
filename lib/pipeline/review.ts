@@ -2,6 +2,7 @@ import type { Workspace, Message, Lead, Stage, Actor } from "@/lib/types";
 import { ApiError } from "@/lib/api/errors";
 import { newId, nowIso } from "@/lib/ids";
 import { audit, agentEvent } from "@/lib/db/store";
+import { recordSendWithoutApproval } from "@/lib/monitor";
 
 export function findMessage(ws: Workspace, id: string) {
   const message = ws.messages.find((m) => m.id === id);
@@ -26,6 +27,11 @@ export function moveStage(ws: Workspace, lead: Lead, to: Stage, actor: Actor, no
 
 /** After any first send (email by agent, LinkedIn by rep), the lead moves Matched → Contacted. */
 export function markSent(ws: Workspace, m: Message, lead: Lead, via: { deliveredTo: Message["deliveredTo"]; actor: Actor; detail: string }) {
+  // Last line of the HITL gate: nothing is marked sent unless a human approved it.
+  if (m.status !== "approved") {
+    recordSendWithoutApproval(m.id, m.status);
+    throw new ApiError("INVALID_STATE", `Message ${m.id} is ${m.status}, not approved; it cannot be sent`);
+  }
   m.status = "sent";
   m.sentAt = nowIso();
   m.deliveredTo = via.deliveredTo;

@@ -1,4 +1,5 @@
 import "server-only";
+import { vendorFetch } from "@/lib/monitor";
 import { env, isLive } from "@/lib/env";
 
 export type MeteredEvent = "lead_enriched" | "outreach_sent" | "graph_query" | "signal_refresh";
@@ -31,7 +32,7 @@ export const roundCredits = (n: number) => Math.round(n * 10) / 10;
 
 const headers = () => ({ "content-type": "application/json", "x-api-key": env.flexpriceKey! });
 async function call<T>(method: string, path: string, body?: unknown): Promise<{ ok: boolean; status: number; data: T | null }> {
-  const res = await fetch(`${env.flexpriceBaseUrl}${path}`, { method, headers: headers(), body: body ? JSON.stringify(body) : undefined });
+  const res = await vendorFetch("flexprice", `${env.flexpriceBaseUrl}${path}`, { method, headers: headers(), body: body ? JSON.stringify(body) : undefined });
   const data = (await res.json().catch(() => null)) as T | null;
   return { ok: res.ok, status: res.status, data };
 }
