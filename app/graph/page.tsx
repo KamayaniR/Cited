@@ -54,7 +54,7 @@ export default function GraphPage() {
           <button key={t.key} role="tab" aria-selected={tab === t.key && Boolean(res)} onClick={() => run(t.key)} disabled={busy}
             className={`rounded-[6px] px-3 py-1.5 text-[13px] font-medium ${tab === t.key && res ? "bg-ink text-white" : "border border-line bg-white hover:bg-paper"}`}>{t.label}</button>
         ))}
-        <span className="text-[12px] text-muted">1 credit per query</span>
+        <span className="text-[12px] text-muted">0.5 credits per query</span>
       </div>
 
       {error && <div className="mb-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[13px] text-danger">{error}</div>}

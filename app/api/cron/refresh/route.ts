@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { ApiError, route } from "@/lib/api/errors";
 import { refreshSignals } from "@/lib/pipeline/refresh";
+import { syncPendingUsage } from "@/lib/pipeline/billing";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -15,5 +16,6 @@ export const GET = route(async (req: Request) => {
     throw new ApiError("UNAUTHORIZED", "Missing or wrong CRON_SECRET");
   }
   const r = await refreshSignals({ actor: "agent", trigger: "cron" });
-  return NextResponse.json({ processed: r.processed, added: r.added, tierChanges: r.tierChanges, skippedForCredits: r.skippedForCredits, filtered: r.filtered });
+  const usage = await syncPendingUsage(); // second step: retry Flexprice events that didn't land
+  return NextResponse.json({ processed: r.processed, added: r.added, tierChanges: r.tierChanges, skippedForCredits: r.skippedForCredits, filtered: r.filtered, usageSynced: usage.synced });
 });

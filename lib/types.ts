@@ -95,7 +95,7 @@ export interface Approval { id: string; kind: "outreach" | "schema" | "icp"; req
 
 /** The whole single-org workspace. Mock mode keeps this in memory (persisted to .data/). */
 export interface Workspace {
-  org: { id: string; name: string; creditsBalance: number };
+  org: { id: string; name: string; creditsBalance: number; plan?: "free" | "founder" | "team"; flexpriceCustomerId?: string | null; flexpriceWalletId?: string | null };
   product: (ProductInput & { id: string }) | null;
   icp: { id: string; version: number; data: Icp; approvedAt: string | null } | null;
   expansions: Expansion[];

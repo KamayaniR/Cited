@@ -51,7 +51,7 @@ Ontology (`lib/graph/model.ts`, schema in `lib/graph/schema.cypher`). Node ids e
 - `uses` is derived from signals that name a non-status-quo competitor; `renewal` is set when the signal mentions a renewal.
 - **Engine.** With `NEO4J_*` set, the graph is mirrored to Neo4j after discovery, enrichment, refresh and seeding (delete this org's nodes, then batched `UNWIND … MERGE` per label and edge type), and queries run as Cypher scoped by `$org`. Without keys, or if Neo4j fails, the same query runs over the in-memory graph with the same row shape, and the response says which engine answered.
 
-### The three queries (`lib/graph/queries.ts`, `GET /api/graph/query?q=`; 1 credit each)
+### The three queries (`lib/graph/queries.ts`, `GET /api/graph/query?q=`; 0.5 credits each)
 
 1. **Warm path**: `(Team)-[previously_employed_at|studied_at]->(x)<-[same]-(Person)-[works_at]->(Company)`. Demo: Maya Chen → Stratus Data → Priya Natarajan (VP Finance, Northwind, the lead's buyer).
 2. **Hiring → evaluation**: a company with a `hiring` signal and at least one evaluation trigger (tech adoption, funding, leadership change, expansion), with the lead's buyer. Demo: Northwind (finance data hiring + Series C).
@@ -69,3 +69,19 @@ Excluded companies never appear in any query.
 4. Graph mirror.
 
 Demo seed scores now come from the same fit/intent formula, so a refresh only moves a score when the signals change.
+
+## Billing and credit gate (P5)
+
+| Metered event | Credits |
+|---|---|
+| lead_enriched | 2 |
+| outreach_sent (approved send only; drafts are free) | 1 |
+| graph_query | 0.5 |
+| signal_refresh (per company) | 0.2 |
+
+Plans: Free (100 credits once), Founder $99/month (1,500), Team $399/month (7,500); overage and top-ups at $0.08 per credit.
+
+- **Gate.** `requireCredits` checks the local ledger (`org.creditsBalance`, one decimal) synchronously before every paid vendor call: enrichment, send, graph query. It throws `402 CREDIT_LIMIT`. Scheduled refresh skips and counts instead of failing. The ledger is the gate so a slow billing API can never let spend run past zero.
+- **Meter.** `charge` writes a `usage_events` row and sends it to Flexprice `POST /events` with `external_customer_id` = org id and `event_id` = the row id, so retries are deduplicated. Rows that didn't land (`flexprice_synced = false`) are retried by the cron route and by "Sync now" on /billing.
+- **Wallet.** On the first top-up or sync with a key, Cited finds or creates the Flexprice customer (`GET /customers/external/{id}`, else `POST /customers`) and a prepaid wallet loaded with the current balance (`POST /wallets`). Top-ups go to `POST /wallets/{id}/top-up` with `PURCHASED_CREDIT_DIRECT` and an idempotency key; /billing shows the wallet's real-time balance (`GET /wallets/{id}/balance/real-time`).
+- `POST /api/billing/topup { amount }` (10 to 5,000 whole credits) → `{ balance }`; `GET /api/billing` → balance, plan, prices, usage by event, Flexprice state.

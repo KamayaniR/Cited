@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { api } from "@/components/api";
 import { Button } from "@/components/ui";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -39,6 +40,7 @@ function EnrichButton() {
   const [msg, setMsg] = useState<string | null>(null);
   const done = new Set(ws?.leads.map((l) => l.companyId));
   const todo = ws?.companies.filter((c) => !c.excluded && !done.has(c.id)).length ?? 0;
+  const broke = (ws?.org.creditsBalance ?? 0) < 2;
   const run = async () => {
     setBusy(true); setMsg(null);
     try { const r = await api<{ enriched: number; sources: { hunter: number; apollo: number } }>("/api/enrich", { method: "POST", body: {} }); setMsg(`${r.enriched} enriched · Hunter ${r.sources.hunter} calls, Apollo ${r.sources.apollo}`); }
@@ -48,7 +50,8 @@ function EnrichButton() {
   return (
     <>
       {msg && <span className="text-[12px] text-muted">{msg}</span>}
-      <Button onClick={run} disabled={busy || todo === 0} title="2 credits per lead">{busy ? "Enriching…" : todo ? `Enrich ${todo} leads` : "All enriched"}</Button>
+      {broke && todo > 0 && <span className="text-[12px] text-danger">Out of credits. <Link href="/billing" className="underline">Top up</Link></span>}
+      <Button onClick={run} disabled={busy || todo === 0 || broke} title="2 credits per lead">{busy ? "Enriching…" : todo ? `Enrich ${todo} leads` : "All enriched"}</Button>
     </>
   );
 }

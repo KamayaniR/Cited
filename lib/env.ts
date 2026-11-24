@@ -10,7 +10,7 @@ export const env = {
   apolloKey: process.env.APOLLO_API_KEY,
   sendgridKey: process.env.SENDGRID_API_KEY,
   sendgridFrom: process.env.SENDGRID_FROM,
-  flexpriceKey: process.env.FLEXPRICE_API_KEY,
+  get flexpriceKey() { return process.env.FLEXPRICE_API_KEY; },
   flexpriceBaseUrl: process.env.FLEXPRICE_BASE_URL ?? "https://api.cloud.flexprice.io/v1",
   bandKey: process.env.BAND_API_KEY,
   bandRoomId: process.env.BAND_ROOM_ID,

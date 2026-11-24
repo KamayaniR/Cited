@@ -167,7 +167,7 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
     const matchedAt = ws.leadEvents.find((e) => e.id === `lev_${l.id}`)?.at ?? at(41);
     ws.usageEvents.push({ id: `use_${i}`, eventName: "lead_enriched", quantity: 1, credits: 2, leadId: l.id, flexpriceSynced: false, at: matchedAt });
   });
-  ws.usageEvents.sort((a, b) => a.at.localeCompare(b.at));
+  ws.usageEvents.sort((a, b) => b.at.localeCompare(a.at)); // newest first, like charge()
   ws.org.creditsBalance -= ws.usageEvents.reduce((s, u) => s + u.credits, 0);
 
   return ws;

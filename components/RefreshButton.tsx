@@ -25,7 +25,7 @@ export function RefreshButton({ variant = "secondary" }: { variant?: "primary" |
     <span className="flex items-center gap-2">
       {msg ? <span className="max-w-[360px] text-[12px] text-muted" role="status">{msg}</span>
         : last && <span className="text-[12px] text-muted" title="Signals refresh every 6 hours for Tier A/B">Last refresh {new Date(last).toLocaleString()}</span>}
-      <Button variant={variant} onClick={run} disabled={busy || !ws?.companies.length} title="Re-pull signals for Tier A/B companies, re-score and re-tier. 1 credit per company.">{busy ? "Refreshing…" : "Run refresh now"}</Button>
+      <Button variant={variant} onClick={run} disabled={busy || !ws?.companies.length} title="Re-pull signals for Tier A/B companies, re-score and re-tier. 0.2 credits per company.">{busy ? "Refreshing…" : "Run refresh now"}</Button>
     </span>
   );
 }

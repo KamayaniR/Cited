@@ -69,13 +69,13 @@ describe("multi-hop queries (memory engine)", () => {
     for (const c of Object.values(CYPHER)) { expect(c).toContain("$org"); expect(c).toContain("c.excluded = false"); }
   });
 
-  it("the API charges one credit per query and returns 402 when out", async () => {
+  it("the API charges 0.5 credits per query and returns 402 when out", async () => {
     const before = getWorkspace().org.creditsBalance;
     const res = await graphQuery(new Request("http://t/api/graph/query?q=warm"));
     const body = await res.json();
     expect(body.engine).toBe("memory");
     expect(body.rows.length).toBeGreaterThan(0);
-    expect(getWorkspace().org.creditsBalance).toBe(before - 1);
+    expect(getWorkspace().org.creditsBalance).toBe(before - 0.5);
     getWorkspace().org.creditsBalance = 0;
     expect((await graphQuery(new Request("http://t/api/graph/query?q=warm"))).status).toBe(402);
     expect((await graphQuery(new Request("http://t/api/graph/query?q=nope"))).status).toBe(400);
