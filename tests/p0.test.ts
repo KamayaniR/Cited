@@ -29,8 +29,12 @@ describe("demo workspace invariants", () => {
     for (const c of ws.companies) if (c.hq) expect(c.hqSource).not.toBeNull();
   });
 
-  it("nothing is sent in the seed and drafts await approval", () => {
-    expect(ws.messages.every((m) => m.status !== "sent" && m.sentAt === null)).toBe(true);
+  it("seed sends only to the demo inbox or by hand on LinkedIn, and new drafts await approval", () => {
+    for (const m of ws.messages.filter((m) => m.status === "sent")) {
+      expect(m.sentAt).not.toBeNull();
+      expect(m.deliveredTo).toBe(m.channel === "email" ? "demo" : "manual:linkedin");
+    }
+    expect(ws.messages.filter((m) => m.status !== "sent").every((m) => m.sentAt === null)).toBe(true);
     expect(ws.messages.some((m) => m.status === "pending_approval")).toBe(true);
   });
 

@@ -1,4 +1,4 @@
-import type { Workspace, Company, Person, Lead, Message, Signal, Citation, Source } from "@/lib/types";
+import type { Workspace, Company, Person, Lead, Message, Signal, Citation, Source, Stage, Actor } from "@/lib/types";
 import { emptyWorkspace } from "@/lib/db/store";
 import { combineScore, tierFor } from "@/lib/pipeline/scoring";
 import { DEMO_COMPANIES, DEMO_COMPETITORS, DEMO_ICP, DEMO_PRODUCT, mockPersonContact } from "./fixtures";
@@ -89,6 +89,48 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
       "Hi Priya, one more thought: with the UK expansion from the Series C, a second entity usually adds two or three days to each close. Ledgerlight handles multi-entity consolidation out of the box. Open to a short call?"),
   );
 
+  // History for the other leads, so the Kanban and analytics have something real to show.
+  // Sent touches went to the demo inbox (email) or were sent by hand by the rep (LinkedIn).
+  const DAY = 60 * 24;
+  const story: Record<string, { steps: [Stage, Actor, string, number][]; touch: "email" | "linkedin"; outcome?: "won" | "lost"; reason?: string }> = {
+    brightpath: { touch: "email", steps: [["contacted", "agent", "First touch sent (email)", 3 * DAY]] },
+    halcyon: { touch: "email", steps: [["contacted", "agent", "First touch sent (email)", 6 * DAY], ["replied", "agent", "Inbound reply: asked for pricing", 4 * DAY], ["meeting_booked", "rep", "Demo booked for Thursday", 2 * DAY]] },
+    corvid: { touch: "email", steps: [["contacted", "agent", "First touch sent (email)", 7 * DAY], ["replied", "agent", "Inbound reply: not a priority this quarter", 5 * DAY], ["closed_lost", "rep", "Building reconciliation in house", 3 * DAY]], outcome: "lost", reason: "Building reconciliation in house" },
+    tessellate: { touch: "linkedin", steps: [["contacted", "rep", "First touch sent (linkedin)", 4 * DAY], ["replied", "rep", "Replied on LinkedIn", 1 * DAY]] },
+    quillon: { touch: "email", steps: [["contacted", "agent", "First touch sent (email)", 9 * DAY], ["replied", "agent", "Inbound reply: interested", 7 * DAY], ["meeting_booked", "rep", "Intro call booked", 5 * DAY], ["closed_lost", "rep", "Signed a 3 month pilot", 1 * DAY]], outcome: "won", reason: "Signed a 3 month pilot" },
+  };
+  for (const [key, st] of Object.entries(story)) {
+    const lead = ws.leads.find((l) => l.companyId === `co_${key}`);
+    if (!lead) continue;
+    const c = ws.companies.find((x) => x.id === lead.companyId)!;
+    const person = ws.people.find((p) => p.id === lead.personId)!;
+    const sig = ws.signals.find((s) => s.companyId === c.id)!;
+    let from: Stage = lead.stage;
+    for (const [to, actor, note, ago] of st.steps) {
+      ws.leadEvents.push({ id: `lev_${lead.id}_${to}`, leadId: lead.id, fromStage: from, toStage: to, actor, note, at: at(ago) });
+      if (actor === "rep") ws.auditLog.push({ id: `aud_${lead.id}_${to}`, actor: "rep", agent: "ui", action: "stage_changed", target: lead.id, detail: `${c.name}: ${from} → ${to}${to === "closed_lost" ? ` (${st.outcome}: ${note})` : ""}`, at: at(ago) });
+      from = to; lead.stage = to; lead.owner = actor;
+    }
+    lead.outcome = st.outcome ?? null;
+    lead.closeReason = st.reason ?? null;
+    const first = st.steps[0][3];
+    const matchedEv = ws.leadEvents.find((e) => e.id === `lev_${lead.id}`);
+    if (matchedEv) matchedEv.at = at(first + 120);
+    const first_name = person.name.split(" ")[0];
+    ws.messages.push({
+      id: `msg_${key}_1`, leadId: lead.id, personId: person.id, channel: st.touch, step: 1, dayOffset: 0, variant: lead.variant,
+      valueProp: lead.variant === "A" ? "Close in 3 days, not 10" : "Fewer close errors",
+      subject: st.touch === "email" ? `${c.name} and the month end close` : null,
+      body: st.touch === "email"
+        ? `Hi ${first_name},\n\nSaw that ${c.name} ${sig.summary.charAt(0).toLowerCase()}${sig.summary.slice(1)}. Teams at that point often feel the close stretch.\n\nLedgerlight reconciles bank feeds inside NetSuite. Worth a short look?\n\nMaya`
+        : `Hi ${first_name}, noticed ${c.name} ${sig.summary.charAt(0).toLowerCase()}${sig.summary.slice(1)}. Happy to share how other finance teams shortened the close.`,
+      signalIds: [sig.id], status: "sent", review: { reviewer: "pass", security: "pass" }, editedByRep: false,
+      sentAt: at(first), deliveredTo: st.touch === "email" ? "demo" : "manual:linkedin",
+    });
+    ws.auditLog.push({ id: `aud_${key}_sent`, actor: st.steps[0][1], agent: st.touch === "email" ? "builder" : "ui", action: st.touch === "email" ? "email_sent" : "linkedin_marked_sent", target: `msg_${key}_1`, detail: st.touch === "email" ? "Sent to demo inbox" : "Rep sent on LinkedIn by hand", at: at(first) });
+    ws.usageEvents.push({ id: `use_send_${key}`, eventName: "outreach_sent", quantity: 1, credits: 1, leadId: lead.id, flexpriceSynced: false, at: at(first) });
+  }
+
   const ev = (from: Workspace["agentEvents"][number]["fromRole"], to: Workspace["agentEvents"][number]["toRole"], kind: string, text: string, minAgo: number, tokens = 0) =>
     ws.agentEvents.push({ id: `aev_${ws.agentEvents.length}`, fromRole: from, toRole: to, kind, text, tokens, costUsd: 0, at: at(minAgo) });
   ev("planner", "builder", "handoff", "@builder TASK icp  product=prod_ledgerlight", 60, 820);
@@ -111,7 +153,11 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
   ws.auditLog.sort((a, b) => b.at.localeCompare(a.at));
 
   // Enrichment of 6 leads at 2 credits each.
-  ws.leads.forEach((l, i) => ws.usageEvents.push({ id: `use_${i}`, eventName: "lead_enriched", quantity: 1, credits: 2, leadId: l.id, flexpriceSynced: false, at: at(41) }));
+  ws.leads.forEach((l, i) => {
+    const matchedAt = ws.leadEvents.find((e) => e.id === `lev_${l.id}`)?.at ?? at(41);
+    ws.usageEvents.push({ id: `use_${i}`, eventName: "lead_enriched", quantity: 1, credits: 2, leadId: l.id, flexpriceSynced: false, at: matchedAt });
+  });
+  ws.usageEvents.sort((a, b) => a.at.localeCompare(b.at));
   ws.org.creditsBalance -= ws.usageEvents.reduce((s, u) => s + u.credits, 0);
 
   return ws;

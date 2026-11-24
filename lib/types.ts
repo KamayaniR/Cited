@@ -75,7 +75,7 @@ export interface Person {
   linkedinUrl: string | null; linkedinSource: Source | null; personaMatch: number;
 }
 export interface Competitor { id: string; name: string; domain: string; category: "direct" | "adjacent" | "status_quo"; positioning: string; pricing: string; ourAdvantage: string; sourceUrl: string }
-export interface Lead { id: string; companyId: string; personId: string; stage: Stage; outcome: "won" | "lost" | null; owner: Actor; variant: "A" | "B" }
+export interface Lead { id: string; companyId: string; personId: string; stage: Stage; outcome: "won" | "lost" | null; closeReason?: string | null; owner: Actor; variant: "A" | "B" }
 export interface LeadEvent { id: string; leadId: string; fromStage: Stage | null; toStage: Stage; actor: Actor; note: string; at: string }
 export interface Message {
   id: string; leadId: string; personId: string; channel: z.infer<typeof ChannelEnum>; step: 1 | 2 | 3; dayOffset: number;

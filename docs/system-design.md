@@ -29,3 +29,11 @@ Per company, best score first, with a 2-credit check before each lead: Hunter Co
 3. @security (`lib/agents/security.ts`): links only to cited domains; no email addresses or secrets in copy.
 4. @human approves, edits or rejects. Approving an email sends it through SendGrid to `DEMO_RECIPIENT` (simulated unless `SENDING_ENABLED=true`), charges 1 credit, and moves the lead Matched → Contacted tagged *agent*. Approving a LinkedIn note only queues it; the rep copies it, sends by hand and clicks "Mark sent", which moves the lead tagged *rep*.
 5. SendGrid Inbound Parse posts replies to `/api/webhooks/sendgrid?token=CRON_SECRET`; a reply moves the lead to Replied.
+
+## Pipeline, attribution and analytics (P3)
+
+- Five stages: Matched, Contacted, Replied, Meeting Booked, Closed/Lost. Agents move leads automatically (first send moves Matched to Contacted; an inbound reply moves to Replied). Reps drag cards on the Kanban, which calls `PATCH /api/leads/:id/stage`.
+- Every move writes a `lead_events` row with `actor` (agent or rep) and a note, sets `lead.owner` to that actor, and writes an audit entry `stage_changed`. The lead history drawer reads `lead_events`.
+- Closed/Lost requires `outcome` won or lost (400 otherwise) and takes an optional reason, stored as `lead.closeReason`. Moving a closed lead back out clears both.
+- `GET /api/analytics?groupBy=industry|tier|variant` (`lib/pipeline/analytics.ts`). Reached stages come from history and are cumulative for open stages, so a lead dragged straight to Meeting Booked still counts as contacted and replied. Reply and meeting rates are over contacted leads; win rate is over closed leads.
+- The audit log page filters by actor and action.
