@@ -1,17 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
+import { BarChart3, Users, MessageCircleReply, CalendarCheck, Trophy, Factory, Layers, FlaskConical } from "lucide-react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Card, PageTitle } from "@/components/ui";
+import { Card, PageTitle, Segmented, SectionTitle, Stat } from "@/components/ui";
+import { Tip } from "@/components/Tip";
 import { EmptyState } from "@/components/EmptyState";
 import { api } from "@/components/api";
 import type { FunnelRow, GroupBy } from "@/lib/pipeline/analytics";
 
-const GROUPS: { key: GroupBy; label: string }[] = [
-  { key: "industry", label: "Industry" },
-  { key: "tier", label: "Tier" },
-  { key: "variant", label: "A/B variant" },
-];
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+const RATES: { key: "replyRate" | "meetingRate" | "winRate"; label: string; color: string }[] = [
+  { key: "replyRate", label: "Reply", color: "#7C3AED" },
+  { key: "meetingRate", label: "Meeting", color: "#0284C7" },
+  { key: "winRate", label: "Win", color: "#059669" },
+];
 
 export default function AnalyticsPage() {
   const { ws } = useWorkspace();
@@ -24,96 +26,81 @@ export default function AnalyticsPage() {
     api<{ total: FunnelRow | null; rows: FunnelRow[] }>(`/api/analytics?groupBy=${groupBy}`).then(setData).catch((e) => setError(e.message));
   }, [ws, groupBy]);
 
-  if (!ws?.leads.length) return (<div><PageTitle kicker="Analytics" title="Conversion by industry, tier and variant" /><EmptyState what="leads" /></div>);
+  const title = <PageTitle icon={BarChart3} title="Analytics" tip="Conversion by industry, tier and A/B variant. Counts come from each lead's stage history, so a lead dragged straight to Meeting Booked still counts as contacted and replied. Rates are over contacted leads; win rate is over closed leads." />;
+  if (!ws?.leads.length) return <div>{title}<EmptyState what="leads" /></div>;
   const t = data?.total;
 
   return (
     <div>
-      <PageTitle kicker="Analytics" title="Conversion by industry, tier and variant" />
+      {title}
       {error && <div className="mb-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[13px] text-danger">{error}</div>}
       {t && (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="Leads" value={String(t.leads)} />
-            <Stat label="Reply rate" value={pct(t.replyRate)} hint={`${t.reached.replied} of ${t.reached.contacted} contacted`} />
-            <Stat label="Meeting rate" value={pct(t.meetingRate)} hint={`${t.reached.meeting_booked} of ${t.reached.contacted} contacted`} />
-            <Stat label="Win rate" value={pct(t.winRate)} hint={`${t.won} won, ${t.lost} lost`} />
+            <Stat icon={Users} label="Leads" value={t.leads} />
+            <Stat icon={MessageCircleReply} label="Reply rate" value={pct(t.replyRate)} tone="violet" tip={`${t.reached.replied} of ${t.reached.contacted} contacted`} />
+            <Stat icon={CalendarCheck} label="Meeting rate" value={pct(t.meetingRate)} tone="blue" tip={`${t.reached.meeting_booked} of ${t.reached.contacted} contacted`} />
+            <Stat icon={Trophy} label="Win rate" value={pct(t.winRate)} tone="green" tip={`${t.won} won, ${t.lost} lost`} />
           </div>
-          <Card className="mb-6 p-4">
-            <div className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-muted">Funnel, all leads</div>
+          <Card className="mb-5 p-4">
+            <SectionTitle>Funnel</SectionTitle>
             <Funnel row={t} />
           </Card>
         </>
       )}
-      <div className="mb-3 flex gap-1" role="tablist">
-        {GROUPS.map((g) => (
-          <button key={g.key} role="tab" aria-selected={groupBy === g.key} onClick={() => setGroupBy(g.key)}
-            className={`rounded-[6px] px-3 py-1.5 text-[13px] font-medium ${groupBy === g.key ? "bg-ink text-white" : "border border-line bg-white"}`}>{g.label}</button>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <Segmented value={groupBy} onChange={setGroupBy} options={[
+          { value: "industry", label: "Industry", icon: Factory },
+          { value: "tier", label: "Tier", icon: Layers },
+          { value: "variant", label: "A/B variant", icon: FlaskConical },
+        ]} />
+        <span className="flex items-center gap-3 text-[11px] text-muted">{RATES.map((r) => <span key={r.key} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: r.color }} />{r.label}</span>)}</span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {data?.rows.map((r) => (
+          <Card key={r.group} className="p-3.5">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="truncate font-medium">{r.group}</span>
+              <Tip content={`Contacted ${r.reached.contacted} · replied ${r.reached.replied} · meetings ${r.reached.meeting_booked} · won ${r.won} / lost ${r.lost}`}>
+                <span className="flex items-center gap-1 text-[11px] text-muted"><Users size={12} />{r.leads}</span>
+              </Tip>
+            </div>
+            <div className="flex h-24 items-end gap-3">
+              {RATES.map((k) => {
+                const v = k.key === "winRate" && !(r.won + r.lost) ? null : r[k.key];
+                return (
+                  <Tip key={k.key} content={`${k.label} rate ${v === null ? "n/a (no closes)" : pct(v)}`} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                    <span className="font-mono text-[10px] text-muted">{v === null ? "–" : pct(v)}</span>
+                    <span className="w-full rounded-t-[4px]" style={{ height: `${Math.max(v ? 4 : 2, (v ?? 0) * 70)}px`, background: v === null ? "#E5E5E5" : k.color }} />
+                  </Tip>
+                );
+              })}
+            </div>
+          </Card>
         ))}
       </div>
-      <Card>
-        <table className="w-full text-[13px]">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
-            <tr>{["Group", "Leads", "Contacted", "Replied", "Meetings", "Won / lost", "Reply rate", "Win rate"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {data?.rows.map((r) => (
-              <tr key={r.group}>
-                <td className="px-3 py-2 font-medium">{r.group}</td>
-                <td className="px-3 py-2 font-mono">{r.leads}</td>
-                <td className="px-3 py-2 font-mono">{r.reached.contacted}</td>
-                <td className="px-3 py-2 font-mono">{r.reached.replied}</td>
-                <td className="px-3 py-2 font-mono">{r.reached.meeting_booked}</td>
-                <td className="px-3 py-2 font-mono">{r.won} / {r.lost}</td>
-                <td className="px-3 py-2"><RateBar value={r.replyRate} /></td>
-                <td className="px-3 py-2">{r.won + r.lost ? <RateBar value={r.winRate} /> : <span className="text-muted">no closes</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      <p className="mt-3 text-[12px] text-muted">Counts come from each lead&apos;s stage history, so a lead dragged straight to Meeting Booked still counts as contacted and replied. Rates are over contacted leads; win rate is over closed leads.</p>
     </div>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card className="p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</div>
-      <div className="mt-1 font-serif text-[28px] leading-none">{value}</div>
-      {hint && <div className="mt-1 text-[12px] text-muted">{hint}</div>}
-    </Card>
   );
 }
 
 function Funnel({ row }: { row: FunnelRow }) {
   const steps = [
-    { label: "Matched", n: row.reached.matched },
-    { label: "Contacted", n: row.reached.contacted },
-    { label: "Replied", n: row.reached.replied },
-    { label: "Meeting booked", n: row.reached.meeting_booked },
-    { label: "Closed won", n: row.won },
+    { label: "Matched", n: row.reached.matched, color: "#9CA3AF" },
+    { label: "Contacted", n: row.reached.contacted, color: "#0284C7" },
+    { label: "Replied", n: row.reached.replied, color: "#7C3AED" },
+    { label: "Meeting", n: row.reached.meeting_booked, color: "#2F5D50" },
+    { label: "Won", n: row.won, color: "#059669" },
   ];
   const max = Math.max(1, row.leads);
   return (
-    <div className="space-y-1.5">
-      {steps.map((s) => (
-        <div key={s.label} className="grid grid-cols-[130px_1fr_40px] items-center gap-3 text-[13px]">
-          <span className="text-muted">{s.label}</span>
-          <div className="h-5 rounded-[4px] bg-line/50"><div className="h-5 rounded-[4px] bg-accent" style={{ width: `${(s.n / max) * 100}%` }} /></div>
-          <span className="text-right font-mono">{s.n}</span>
-        </div>
+    <div className="grid grid-cols-5 items-end gap-2">
+      {steps.map((s, i) => (
+        <Tip key={s.label} content={`${s.label}: ${s.n}${i ? ` (${Math.round((100 * s.n) / Math.max(1, steps[i - 1].n))}% of previous)` : ""}`} className="flex flex-col items-center gap-1.5">
+          <span className="text-[18px] font-semibold tabular-nums">{s.n}</span>
+          <span className="w-full rounded-[6px]" style={{ height: `${12 + (s.n / max) * 80}px`, background: s.color, opacity: 0.85 }} />
+          <span className="text-[11px] text-muted">{s.label}</span>
+        </Tip>
       ))}
-    </div>
-  );
-}
-
-function RateBar({ value }: { value: number }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-20 rounded-full bg-line"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round(value * 100)}%` }} /></div>
-      <span className="font-mono text-[11px]">{pct(value)}</span>
     </div>
   );
 }

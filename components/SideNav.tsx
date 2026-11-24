@@ -10,7 +10,7 @@ const TABS: { href: string; label: string; icon: typeof Inbox; count?: (ws: Work
   { href: "/intake", label: "Intake & ICP", icon: MessageSquareText },
   { href: "/discovery", label: "Discovery", icon: Search, count: (ws) => ws.companies.filter((c) => !c.excluded).length },
   { href: "/graph", label: "Graph", icon: Share2 },
-  { href: "/outreach", label: "Approval queue", icon: Inbox, count: (ws) => ws.messages.filter((m) => m.status === "pending_approval" || m.status === "needs_fix").length },
+  { href: "/outreach", label: "Approvals", icon: Inbox, count: (ws) => ws.messages.filter((m) => m.status === "pending_approval" || m.status === "needs_fix").length },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/billing", label: "Billing", icon: CreditCard },

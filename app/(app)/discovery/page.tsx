@@ -1,16 +1,24 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { Search, Sparkles, Users, Linkedin, MailCheck, MailWarning, MailX, Mail, MapPin, Swords, Ban, ExternalLink } from "lucide-react";
 import { api } from "@/components/api";
-import { Button } from "@/components/ui";
-import { RefreshButton } from "@/components/RefreshButton";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Badge, Card, PageTitle, SourceBadge, TierBadge } from "@/components/ui";
+import { RefreshButton } from "@/components/RefreshButton";
 import { EmptyState } from "@/components/EmptyState";
-
-const EMAIL_TONE = { valid: "green", accept_all: "amber", invalid: "red", unknown: "neutral" } as const;
+import { Avatar, Badge, Button, Card, PageTitle, ScoreRing, SectionTitle, SourceBadge, Toast } from "@/components/ui";
+import { Tip } from "@/components/Tip";
+import { SignalChip } from "@/components/signals";
+import type { Person } from "@/lib/types";
 
 type RunResult = { moss?: { indexed: number; triggerMatches: number; ms: number }; queries: string[]; companies: unknown[]; filtered: unknown[]; dropped: { name: string; reason: string }[]; mode: string };
+
+const EMAIL: Record<Person["emailStatus"], { icon: typeof Mail; cls: string; label: string }> = {
+  valid: { icon: MailCheck, cls: "text-tier-a", label: "Verified" },
+  accept_all: { icon: MailWarning, cls: "text-tier-b", label: "Accept-all domain" },
+  invalid: { icon: MailX, cls: "text-danger", label: "Invalid" },
+  unknown: { icon: Mail, cls: "text-tier-c", label: "Unknown" },
+};
 
 function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
   const { ws, refresh } = useWorkspace();
@@ -24,13 +32,14 @@ function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
     finally { setBusy(false); }
   };
   return (
-    <div className="flex items-center gap-3">
-      {error && <span className="text-[12px] text-danger">{error}</span>}
-      {!ready && <span className="text-[12px] text-muted">Approve the ICP first</span>}
-      <Button variant={ws?.companies.length ? "secondary" : "primary"} onClick={run} disabled={busy || !ready}>{busy ? "Discovering…" : "Run discovery"}</Button>
+    <>
+      {error && <Toast tone="red">{error}</Toast>}
+      <Tip content={ready ? "Search for companies that match the approved ICP. Each lead must cite a page search returned." : "Approve the ICP first"}>
+        <Button variant={ws?.companies.length ? "secondary" : "primary"} icon={Search} onClick={run} disabled={busy || !ready}>{busy ? "Discovering…" : "Run discovery"}</Button>
+      </Tip>
       {Boolean(ws?.companies.length) && <RefreshButton />}
       {Boolean(ws?.companies.length) && <EnrichButton />}
-    </div>
+    </>
   );
 }
 
@@ -49,9 +58,11 @@ function EnrichButton() {
   };
   return (
     <>
-      {msg && <span className="text-[12px] text-muted">{msg}</span>}
-      {broke && todo > 0 && <span className="text-[12px] text-danger">Out of credits. <Link href="/billing" className="underline">Top up</Link></span>}
-      <Button onClick={run} disabled={busy || todo === 0 || broke} title="2 credits per lead">{busy ? "Enriching…" : todo ? `Enrich ${todo} leads` : "All enriched"}</Button>
+      {msg && <Toast>{msg}</Toast>}
+      {broke && todo > 0 && <Link href="/billing"><Badge tone="red">Out of credits · top up</Badge></Link>}
+      <Tip content="Find the buyer, verify email and MX with Hunter, fill LinkedIn, HQ and history from Apollo. 2 credits per lead.">
+        <Button icon={Users} onClick={run} disabled={busy || todo === 0 || broke}>{busy ? "Enriching…" : todo ? `Enrich ${todo} leads` : "All enriched"}</Button>
+      </Tip>
     </>
   );
 }
@@ -59,23 +70,27 @@ function EnrichButton() {
 export default function DiscoveryPage() {
   const { ws } = useWorkspace();
   const [last, setLast] = useState<RunResult | null>(null);
-  if (!ws?.companies.length) return (<div><PageTitle kicker="Discovery" title="Cited companies"><RunDiscovery onDone={setLast} /></PageTitle><EmptyState what="companies" /></div>);
+  const header = <PageTitle icon={Search} title="Discovery" tip="Companies that fit the ICP. Every lead and signal links to the page search returned; leads without a source are dropped, and negative signals filter a company out."><RunDiscovery onDone={setLast} /></PageTitle>;
+  if (!ws?.companies.length) return <div>{header}<EmptyState what="companies" /></div>;
   const rows = [...ws.companies].sort((a, b) => Number(a.excluded) - Number(b.excluded) || b.score - a.score);
+
   return (
     <div>
-      <PageTitle kicker="Discovery" title="Cited companies"><RunDiscovery onDone={setLast} /></PageTitle>
+      {header}
       {last && (
-        <Card className="mb-4 p-3 text-[12px]">
-          <div><span className="font-semibold">{last.companies.length}</span> cited companies, <span className="font-semibold">{last.filtered.length}</span> filtered, <span className="font-semibold">{last.dropped.length}</span> dropped for missing citations · {last.mode} mode</div>
-          {last.moss && <div className="mt-1 text-muted">Moss indexed {last.moss.indexed} evidence docs and matched {last.moss.triggerMatches} signals to ICP triggers by meaning in {last.moss.ms.toFixed(1)} ms</div>}
-          {last.dropped.map((d) => <div key={d.name} className="mt-1 text-danger">Dropped {d.name}: {d.reason}</div>)}
-          <details className="mt-1 text-muted"><summary className="cursor-pointer">{last.queries.length} search queries</summary>{last.queries.map((q) => <div key={q} className="font-mono text-[11px]">{q}</div>)}</details>
-        </Card>
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <Badge tone="green" icon={Sparkles}>{last.companies.length} cited</Badge>
+          {last.filtered.length > 0 && <Badge tone="red" icon={Ban}>{last.filtered.length} filtered</Badge>}
+          {last.dropped.length > 0 && <Badge tone="amber" title={last.dropped.map((d) => `${d.name}: ${d.reason}`).join("\n")}>{last.dropped.length} dropped (no source)</Badge>}
+          {last.moss && <Badge tone="violet" title={`Moss indexed ${last.moss.indexed} evidence docs and matched ${last.moss.triggerMatches} signals to ICP triggers by meaning`}>Moss · {last.moss.ms.toFixed(1)} ms</Badge>}
+          <Badge title={last.queries.join("\n")}>{last.queries.length} queries · {last.mode}</Badge>
+        </div>
       )}
+
       <Card className="overflow-x-auto">
         <table className="w-full text-[13px]">
-          <thead className="sticky top-0 bg-paper text-left text-[11px] uppercase tracking-wider text-muted">
-            <tr>{["Score", "Fit / Intent", "Company", "Size", "HQ", "Signals", "Buyer", "Email", "LinkedIn", "Sources"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
+          <thead className="text-left text-[10px] tracking-wider text-muted uppercase">
+            <tr className="border-b border-line">{["", "Company", "Signals", "Buyer", "Email", "In", "Sources"].map((h, i) => <th key={i} className="px-3 py-2 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-line">
             {rows.map((c) => {
@@ -83,35 +98,79 @@ export default function DiscoveryPage() {
               const buyer = ws.people.find((p) => p.companyId === c.id);
               const cites = ws.citations.filter((x) => x.entityId === c.id || signals.some((s) => s.id === x.entityId));
               const urls = [...new Set(cites.map((x) => x.url))];
+              const e = buyer ? EMAIL[buyer.emailStatus] : null;
               return (
-                <tr key={c.id} className={`hover:bg-paper ${c.excluded ? "opacity-60" : ""}`}>
-                  <td className="px-3 py-1.5">{c.excluded ? <Badge tone="red" title={c.excludeReason ?? ""}>Filtered</Badge> : <TierBadge tier={c.tier} score={c.score} />}</td>
-                  <td className="px-3 py-1.5 font-mono text-[11px] text-muted">{c.fitScore} / {c.intentScore}</td>
-                  <td className="px-3 py-1.5 font-medium">{c.name}<div className="font-mono text-[11px] font-normal text-muted">{c.domain}</div><div className="text-[11px] font-normal text-muted">{c.industry}</div>{c.excluded && <div className="text-[11px] font-normal text-danger">{c.excludeReason}</div>}</td>
-                  <td className="px-3 py-1.5 font-mono text-[12px]">{c.headcount}</td>
-                  <td className="px-3 py-1.5">{c.hq ?? <span className="text-muted">–</span>}{c.hqSource && <div className="mt-0.5"><SourceBadge source={c.hqSource} /></div>}</td>
-                  <td className="min-w-[220px] px-3 py-1.5 text-[12px]">{signals.map((s) => <div key={s.id}>{s.summary}</div>)}</td>
-                  <td className="px-3 py-1.5">{buyer ? <>{buyer.name}<div className="text-[11px] text-muted">{buyer.title}</div></> : "–"}</td>
-                  <td className="px-3 py-1.5">{buyer && <div className="space-y-0.5"><Badge tone={EMAIL_TONE[buyer.emailStatus]} title={`${buyer.email ?? "no email"} · MX: ${buyer.mx ? "yes" : "no"} · source: ${buyer.emailSource ?? "none"}`}>{buyer.emailStatus.replace("_", "-")}</Badge><div><SourceBadge source={buyer.emailSource} /></div></div>}</td>
-                  <td className="px-3 py-1.5">{buyer?.linkedinUrl ? <div className="space-y-0.5"><a className="text-accent hover:underline" href={buyer.linkedinUrl} target="_blank" rel="noreferrer">profile</a><div><SourceBadge source={buyer.linkedinSource} title={buyer.linkedinUrl} /></div></div> : <span className="text-muted">–</span>}</td>
-                  <td className="px-3 py-1.5 text-[12px]">{urls.map((u, i) => <a key={u} href={u} title={u} target="_blank" rel="noreferrer" className="mr-1 text-accent hover:underline">[{i + 1}]</a>)}</td>
+                <tr key={c.id} className={`hover:bg-paper ${c.excluded ? "bg-danger/[0.02]" : ""}`}>
+                  <td className="w-12 px-3 py-2">
+                    {c.excluded ? <Tip content={`Filtered: ${c.excludeReason ?? ""}`}><span className="grid h-[34px] w-[34px] place-items-center rounded-full bg-danger/10 text-danger" aria-label="Filtered"><Ban size={15} /></span></Tip>
+                      : <ScoreRing tier={c.tier} score={c.score} fit={c.fitScore} intent={c.intentScore} />}
+                  </td>
+                  <td className={`px-3 py-2 ${c.excluded ? "opacity-60" : ""}`}>
+                    <Tip content={`${c.domain}\n${c.industry} · NAICS ${c.naics}\n${c.headcount.toLocaleString()} employees`}>
+                      <span className="font-medium">{c.name}</span>
+                    </Tip>
+                    <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
+                      <span className="inline-flex items-center gap-0.5"><Users size={11} />{c.headcount.toLocaleString()}</span>
+                      {c.hq && <Tip content={`HQ: ${c.hq}${c.hqSource ? ` (source: ${c.hqSource})` : ""}`}><span className="inline-flex items-center gap-0.5"><MapPin size={11} />{c.hq.split(",")[0]}</span></Tip>}
+                      {c.excluded && <span className="text-danger">{c.excludeReason?.replace(/^Negative signal:\s*/i, "")}</span>}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2"><div className="flex flex-wrap gap-1">{signals.map((s) => <SignalChip key={s.id} s={s} />)}</div></td>
+                  <td className="px-3 py-2">
+                    {buyer ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar name={buyer.name} title={buyer.previouslyAt?.length ? `Previously at ${buyer.previouslyAt.join(", ")}` : undefined} />
+                        <div className="leading-tight"><div className="text-[12px] font-medium">{buyer.name}</div><div className="max-w-[140px] truncate text-[11px] text-muted">{buyer.title}</div></div>
+                      </div>
+                    ) : <span className="text-muted">–</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    {buyer && e && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Tip content={`${e.label}${buyer.email ? `\n${buyer.email}` : ""}\nMX: ${buyer.mx ? "yes" : "no"}`}><e.icon size={16} className={e.cls} aria-label={e.label} /></Tip>
+                        <SourceBadge source={buyer.emailSource} />
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {buyer?.linkedinUrl ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Tip content={buyer.linkedinUrl}><a href={buyer.linkedinUrl} target="_blank" rel="noreferrer" aria-label="LinkedIn profile" className="text-rep hover:opacity-70"><Linkedin size={15} /></a></Tip>
+                        <SourceBadge source={buyer.linkedinSource} />
+                      </span>
+                    ) : <span className="text-muted">–</span>}
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1">
+                      {urls.map((u, i) => <Tip key={u} content={u}><a href={u} target="_blank" rel="noreferrer" className="grid h-5 min-w-5 place-items-center rounded-[4px] bg-accent/10 px-1 font-mono text-[10px] text-accent hover:bg-accent hover:text-white">{i + 1}</a></Tip>)}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </Card>
-      <h2 className="mt-8 mb-3 font-serif text-xl">Competitor map</h2>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {ws.competitors.map((c) => (
-          <Card key={c.id} className="p-4 text-[13px]">
-            <div className="flex items-center justify-between"><span className="font-medium">{c.name}</span><Badge>{c.category.replace("_", " ")}</Badge></div>
-            <p className="mt-1 text-muted">{c.positioning}</p>
-            <p className="mt-2 text-[12px]"><span className="text-muted">Pricing:</span> {c.pricing}</p>
-            <p className="mt-1 text-[12px]"><span className="text-muted">Our advantage:</span> {c.ourAdvantage}</p>
-            <a href={c.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 block text-[12px] text-accent hover:underline">[1] {new URL(c.sourceUrl).hostname}</a>
-          </Card>
-        ))}
+
+      <div className="mt-6">
+        <SectionTitle icon={Swords} tip="Who else the buyer might pick, and why Cited's product wins. Each card cites the competitor's own site.">Competitors</SectionTitle>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {ws.competitors.map((c) => {
+            let host = ""; try { host = new URL(c.sourceUrl).hostname; } catch { /* ignore */ }
+            return (
+              <Tip key={c.id} className="block" content={`${c.positioning}\nPricing: ${c.pricing}`}>
+                <Card className="p-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{c.name}</span>
+                    <Badge tone={c.category === "direct" ? "red" : c.category === "adjacent" ? "amber" : "neutral"}>{c.category.replace("_", " ")}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-start gap-1.5 text-[12px]"><Sparkles size={13} className="mt-0.5 shrink-0 text-tier-a" /><span className="line-clamp-2">{c.ourAdvantage}</span></div>
+                  <a href={c.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-accent hover:underline"><ExternalLink size={11} />{host}</a>
+                </Card>
+              </Tip>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

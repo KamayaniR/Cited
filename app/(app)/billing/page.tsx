@@ -1,7 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { CreditCard, Coins, Plus, RefreshCw, Users, Send, Share2, Activity, Zap, Ban } from "lucide-react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Badge, Button, Card, PageTitle } from "@/components/ui";
+import { Badge, BarRow, Button, Card, PageTitle, SectionTitle, Toast } from "@/components/ui";
+import { Tip } from "@/components/Tip";
 import { api } from "@/components/api";
 
 interface Summary {
@@ -18,6 +20,7 @@ interface Summary {
 
 const PACKS = [100, 500, 1500];
 const EVENT_LABEL: Record<string, string> = { lead_enriched: "Lead enriched", outreach_sent: "Outreach sent", graph_query: "Graph query", signal_refresh: "Signal refresh" };
+const EVENT_ICON: Record<string, typeof Users> = { lead_enriched: Users, outreach_sent: Send, graph_query: Share2, signal_refresh: RefreshCw };
 
 export default function BillingPage() {
   const { ws, refresh } = useWorkspace();
@@ -34,105 +37,96 @@ export default function BillingPage() {
     setBusy(`top${amount}`); setMsg(null);
     try {
       const r = await api<{ balance: number; flexprice: string }>("/api/billing/topup", { method: "POST", body: { amount } });
-      setMsg(`Added ${amount} credits. Balance ${r.balance}.${r.flexprice === "synced" ? " Flexprice wallet topped up." : r.flexprice === "failed" ? " Flexprice wallet top-up failed; local balance updated." : ""}`);
+      setMsg(`+${amount} credits · balance ${r.balance}${r.flexprice === "synced" ? " · Flexprice wallet topped up" : r.flexprice === "failed" ? " · Flexprice top-up failed, local balance updated" : ""}`);
       await refresh();
     } catch (e) { setMsg((e as Error).message); }
     finally { setBusy(null); }
   }
   async function drain() {
     setBusy("drain"); setMsg(null);
-    try { await api("/api/demo/credits", { method: "POST", body: { balance: 0 } }); setMsg("Balance set to 0. Paid calls now return 402 until you top up."); await refresh(); }
+    try { await api("/api/demo/credits", { method: "POST", body: { balance: 0 } }); setMsg("Balance set to 0"); await refresh(); }
     catch (e) { setMsg((e as Error).message); }
     finally { setBusy(null); }
   }
   async function sync() {
     setBusy("sync"); setMsg(null);
-    try { const r = await api<{ attempted: number; synced: number }>("/api/billing/sync", { method: "POST" }); setMsg(`Synced ${r.synced} of ${r.attempted} pending events to Flexprice.`); await refresh(); await load(); }
+    try { const r = await api<{ attempted: number; synced: number }>("/api/billing/sync", { method: "POST" }); setMsg(`Synced ${r.synced} of ${r.attempted} events`); await refresh(); await load(); }
     catch (e) { setMsg((e as Error).message); }
     finally { setBusy(null); }
   }
 
   const usage = ws?.usageEvents ?? [];
   const low = (balance ?? 0) < 2;
+  const planCredits = s?.plan.credits ?? 0;
+  const pctLeft = planCredits ? Math.min(100, Math.round(((balance ?? 0) / planCredits) * 100)) : 0;
+  const maxCredits = Math.max(1, ...(s?.byEvent.map((e) => e.credits) ?? [1]));
+  const live = s?.flexprice.mode === "live";
 
   return (
     <div>
-      <PageTitle kicker="Billing" title="Credits and usage" />
-      {msg && <div className="mb-3 rounded-[6px] bg-accent/10 px-3 py-2 text-[13px]" role="status">{msg}</div>}
+      <PageTitle icon={CreditCard} title="Billing" tip="Credits are metered by Flexprice: 2 per lead enriched, 1 per approved send, 0.5 per graph query, 0.2 per refresh. Drafts are never charged.">
+        {msg && <Toast>{msg}</Toast>}
+      </PageTitle>
 
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <Card className="p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">Balance</div>
-          <div className={`mt-1 font-serif text-[32px] leading-none ${low ? "text-danger" : ""}`}>{balance ?? 0}<span className="ml-1 text-[14px] text-muted">credits</span></div>
-          {low && <div className="mt-1 text-[12px] text-danger">Paid calls are blocked (HTTP 402) until you top up.</div>}
-          {s && <div className="mt-2 text-[12px] text-muted">{s.plan.name} plan · {s.plan.note}</div>}
+          <SectionTitle icon={Coins}>Balance</SectionTitle>
+          <div className="flex items-end gap-3">
+            <div className={`text-[36px] leading-none font-semibold tabular-nums ${low ? "text-danger" : ""}`}>{balance ?? 0}</div>
+            {s && <span className="mb-1"><Badge tone="accent" title={`${s.plan.name} plan · ${s.plan.note}`}>{s.plan.name}</Badge></span>}
+          </div>
+          <div className="mt-3 h-2 rounded-full bg-line/70"><div className={`h-2 rounded-full ${low ? "bg-danger" : "bg-accent"}`} style={{ width: `${pctLeft}%` }} /></div>
+          {low && <div className="mt-2 flex items-center gap-1 text-[12px] text-danger"><Ban size={12} />Paid calls are blocked (HTTP 402) until you top up.</div>}
         </Card>
         <Card className="p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">Top up</div>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <SectionTitle icon={Plus} tip={`$${s?.overageUsdPerCredit.toFixed(2) ?? "0.08"} per credit. Demo only: no card is charged.`}>Top up</SectionTitle>
+          <div className="flex flex-wrap gap-2">
             {PACKS.map((n) => (
               <Button key={n} variant="secondary" onClick={() => topUp(n)} disabled={busy !== null}>
                 +{n} <span className="text-muted">${s ? (n * s.overageUsdPerCredit).toFixed(0) : ""}</span>
               </Button>
             ))}
           </div>
-          <div className="mt-2 text-[12px] text-muted">${s?.overageUsdPerCredit.toFixed(2) ?? "0.08"} per credit. Demo only: no card is charged.</div>
-          {!s?.flexprice.wallet && <button className="mt-1 text-[12px] text-muted underline" onClick={drain} disabled={busy !== null}>Demo: set balance to 0</button>}
+          {!s?.flexprice.wallet && <button className="mt-3 text-[12px] text-muted underline hover:text-danger" onClick={drain} disabled={busy !== null}>Demo: set balance to 0</button>}
         </Card>
         <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">Flexprice</div>
-            <Badge tone={s?.flexprice.mode === "live" ? "green" : "neutral"}>{s?.flexprice.mode === "live" ? "live" : "mock"}</Badge>
+          <SectionTitle icon={Zap} right={<Badge tone={live ? "green" : "neutral"}>{live ? "live" : "mock"}</Badge>} tip={live ? undefined : "Every charge is recorded as a usage event and sent to Flexprice once FLEXPRICE_API_KEY is set."}>Flexprice</SectionTitle>
+          <div className="space-y-1.5 text-[12px]">
+            {live && <div className="flex justify-between"><span className="text-muted">Wallet</span>{s?.flexprice.wallet ? <span className="font-mono">{s.flexprice.wallet.credits}{s.flexprice.wallet.cached ? " (cached)" : ""}</span> : <span className="text-muted">not linked</span>}</div>}
+            <div className="flex justify-between"><span className="text-muted">Waiting to sync</span><span className="font-mono">{s?.unsynced ?? 0}</span></div>
+            <div className="flex justify-between"><span className="text-muted">LLM spend</span><span className="font-mono">${s?.llmCostUsd.toFixed(4) ?? "0"}</span></div>
+            {live && <Button variant="secondary" icon={RefreshCw} onClick={sync} disabled={busy !== null}>{busy === "sync" ? "Syncing…" : "Sync now"}</Button>}
           </div>
-          {s?.flexprice.mode === "live" ? (
-            <div className="mt-2 space-y-1 text-[12px]">
-              <div>Wallet: {s.flexprice.wallet ? <span className="font-mono">{s.flexprice.wallet.credits} credits{s.flexprice.wallet.cached ? " (cached)" : ""}</span> : <span className="text-muted">not linked yet</span>}</div>
-              <div>Events waiting to sync: <span className="font-mono">{s.unsynced}</span></div>
-              <Button variant="secondary" onClick={sync} disabled={busy !== null}>{busy === "sync" ? "Syncing…" : "Sync now"}</Button>
-            </div>
-          ) : (
-            <p className="mt-2 text-[12px] text-muted">Every charge is recorded as a usage event and sent to Flexprice once <span className="font-mono">FLEXPRICE_API_KEY</span> is set. {s?.unsynced ?? 0} events are waiting.</p>
-          )}
         </Card>
       </div>
 
-      <Card className="mb-4">
-        <table className="w-full text-[13px]">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
-            <tr>{["Metered event", "Price", "Count", "Credits used"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {s?.byEvent.map((e) => (
-              <tr key={e.event}>
-                <td className="px-3 py-2">{e.label} <span className="font-mono text-[11px] text-muted">{e.event}</span></td>
-                <td className="px-3 py-2 font-mono">{e.price}</td>
-                <td className="px-3 py-2 font-mono">{e.count}</td>
-                <td className="px-3 py-2 font-mono">{e.credits}</td>
-              </tr>
-            ))}
-            {s && <tr className="font-medium"><td className="px-3 py-2">Total</td><td /><td /><td className="px-3 py-2 font-mono">{s.spent}</td></tr>}
-          </tbody>
-        </table>
-        <p className="border-t border-line px-3 py-2 text-[12px] text-muted">Drafts are never charged: only enrichment, approved sends, graph queries and signal refreshes. LLM cost so far ${s?.llmCostUsd.toFixed(4) ?? "0"}.</p>
+      <Card className="mb-4 p-4">
+        <SectionTitle icon={Activity} tip="Drafts are never charged: only enrichment, approved sends, graph queries and signal refreshes." right={<span className="font-mono text-[12px]">{s?.spent ?? 0} credits</span>}>Usage by event</SectionTitle>
+        <div className="space-y-2.5">
+          {s?.byEvent.map((e) => {
+            const I = EVENT_ICON[e.event] ?? Activity;
+            return <BarRow key={e.event} label={<span className="inline-flex items-center gap-1.5"><I size={13} className="text-muted" />{e.label}</span>} value={e.credits} max={maxCredits} right={`${e.credits}`} tip={`${e.count} × ${e.price} credits`} />;
+          })}
+        </div>
       </Card>
 
       <Card>
-        <div className="px-3 pt-3 text-[11px] font-semibold uppercase tracking-wider text-muted">Usage events</div>
-        <table className="w-full text-[13px]">
-          <thead className="text-left text-[11px] uppercase tracking-wider text-muted"><tr>{["When", "Event", "Credits", "Lead", "Flexprice"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-line">
-            {usage.slice(0, 100).map((u) => (
-              <tr key={u.id}>
-                <td className="px-3 py-1.5 font-mono text-[11px] text-muted">{new Date(u.at).toLocaleString()}</td>
-                <td className="px-3 py-1.5">{EVENT_LABEL[u.eventName] ?? u.eventName}</td>
-                <td className="px-3 py-1.5 font-mono">{u.credits}</td>
-                <td className="px-3 py-1.5 font-mono text-[11px]">{u.leadId}</td>
-                <td className="px-3 py-1.5">{u.flexpriceSynced ? <Badge tone="green">synced</Badge> : <Badge>pending</Badge>}</td>
-              </tr>
-            ))}
-            {!usage.length && <tr><td colSpan={5} className="px-3 py-4 text-center text-muted">No usage yet.</td></tr>}
-          </tbody>
-        </table>
+        <div className="px-3 pt-3"><SectionTitle>Recent usage</SectionTitle></div>
+        <ol className="divide-y divide-line">
+          {usage.slice(0, 50).map((u) => {
+            const I = EVENT_ICON[u.eventName] ?? Activity;
+            return (
+              <li key={u.id} className="flex items-center gap-3 px-3 py-1.5 text-[12px]">
+                <I size={13} className="text-muted" />
+                <span className="flex-1">{EVENT_LABEL[u.eventName] ?? u.eventName}</span>
+                <span className="font-mono text-muted">-{u.credits}</span>
+                <Tip content={u.flexpriceSynced ? "Synced to Flexprice" : "Waiting to sync to Flexprice"}><span className={`h-2 w-2 rounded-full ${u.flexpriceSynced ? "bg-tier-a" : "bg-tier-c"}`} /></Tip>
+                <span className="w-[110px] text-right font-mono text-[10px] text-muted">{new Date(u.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+              </li>
+            );
+          })}
+          {!usage.length && <li className="px-3 py-4 text-center text-muted">No usage yet</li>}
+        </ol>
       </Card>
     </div>
   );

@@ -1,7 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Badge, Card, PageTitle } from "@/components/ui";
+import { Badge, Card, PageTitle, Stat } from "@/components/ui";
+import { Tip, InfoTip } from "@/components/Tip";
+import { Share2, Handshake, Briefcase, Swords, Building2, User, GraduationCap, Users, Code2, Timer, Coins, ExternalLink, CircleDot, GitBranch, Lightbulb, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { RefreshButton } from "@/components/RefreshButton";
 import { api } from "@/components/api";
@@ -10,11 +12,12 @@ import type { QueryKey, WarmRow, HiringRow, DisplacementRow } from "@/lib/graph/
 interface Stats { engine: "neo4j" | "memory"; nodes: Record<string, number>; edges: Record<string, number>; nodeCount: number; edgeCount: number }
 interface Result { q: QueryKey; title: string; question: string; rows: unknown[]; engine: "neo4j" | "memory"; cypher: string; ms: number; fallback?: string }
 
-const TABS: { key: QueryKey; label: string }[] = [
-  { key: "warm", label: "Warm paths" },
-  { key: "hiring", label: "Hiring → evaluation" },
-  { key: "displacement", label: "Competitor displacement" },
+const TABS: { key: QueryKey; label: string; icon: typeof Share2; tip: string }[] = [
+  { key: "warm", label: "Warm paths", icon: Handshake, tip: "Our team and their buyer share a past employer or school" },
+  { key: "hiring", label: "Hiring → evaluation", icon: Briefcase, tip: "Hiring for the role that evaluates a tool like ours" },
+  { key: "displacement", label: "Competitor displacement", icon: Swords, tip: "Customers of a competitor, ideally near renewal" },
 ];
+const NODE_ICON: Record<string, typeof Share2> = { Company: Building2, Person: User, Product: CircleDot, Competitor: Swords, Signal: Lightbulb, Team: Users, School: GraduationCap, Org: Building2 };
 
 export default function GraphPage() {
   const { ws, refresh } = useWorkspace();
@@ -35,51 +38,65 @@ export default function GraphPage() {
   const companyCount = ws?.companies.length ?? 0;
   useEffect(() => { if (companyCount) api<Stats>("/api/graph").then(setStats).catch(() => {}); }, [companyCount, ws?.signals.length]);
 
-  if (!has) return (<div><PageTitle kicker="Graph" title="Knowledge graph queries" /><EmptyState what="companies" /></div>);
+  const title = <PageTitle icon={Share2} title="Knowledge graph" tip="Companies, people, signals, competitors, schools and our team as a graph. Multi-hop queries find the warm way in. 0.5 credits per query."><RefreshButton /></PageTitle>;
+  if (!has) return (<div>{title}<EmptyState what="companies" /></div>);
 
   return (
     <div>
-      <PageTitle kicker="Graph" title="Knowledge graph queries"><RefreshButton /></PageTitle>
+      {title}
 
       {stats && (
-        <Card className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2 p-4 text-[13px]">
-          <Badge tone={stats.engine === "neo4j" ? "green" : "neutral"}>{stats.engine === "neo4j" ? "Neo4j Aura" : "In-memory graph"}</Badge>
-          <span><span className="font-mono">{stats.nodeCount}</span> nodes · <span className="font-mono">{stats.edgeCount}</span> edges</span>
-          <span className="text-muted">{Object.entries(stats.nodes).map(([k, v]) => `${k} ${v}`).join(" · ")}</span>
-        </Card>
+        <div className="mb-4 grid gap-3 md:grid-cols-[auto_auto_1fr]">
+          <Stat icon={CircleDot} label="nodes" value={stats.nodeCount} />
+          <Stat icon={GitBranch} label="edges" value={stats.edgeCount} tone="violet" />
+          <Card className="flex flex-wrap items-center gap-1.5 p-3.5">
+            <Badge tone={stats.engine === "neo4j" ? "green" : "neutral"} title={stats.engine === "neo4j" ? "Live Neo4j Aura" : "Neo4j isn't connected: the same queries run on an in-memory graph"}>{stats.engine === "neo4j" ? "Neo4j" : "In-memory"}</Badge>
+            {Object.entries(stats.nodes).map(([k, v]) => { const I = NODE_ICON[k] ?? CircleDot; return <Badge key={k} icon={I} title={k}>{v}</Badge>; })}
+          </Card>
+        </div>
       )}
 
-      <div className="mb-3 flex flex-wrap items-center gap-2" role="tablist">
-        {TABS.map((t) => (
-          <button key={t.key} role="tab" aria-selected={tab === t.key && Boolean(res)} onClick={() => run(t.key)} disabled={busy}
-            className={`rounded-[6px] px-3 py-1.5 text-[13px] font-medium ${tab === t.key && res ? "bg-ink text-white" : "border border-line bg-white hover:bg-paper"}`}>{t.label}</button>
-        ))}
-        <span className="text-[12px] text-muted">0.5 credits per query</span>
+      <div className="mb-3 grid gap-2 md:grid-cols-3" role="tablist">
+        {TABS.map((t) => {
+          const on = tab === t.key && Boolean(res);
+          return (
+            <Tip key={t.key} content={t.tip} className="block">
+              <button role="tab" aria-selected={on} onClick={() => run(t.key)} disabled={busy}
+                className={`flex w-full items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-left text-[13px] font-medium transition ${on ? "border-ink bg-ink text-white" : "border-line bg-white hover:border-accent"}`}>
+                <span className={`grid h-8 w-8 place-items-center rounded-[8px] ${on ? "bg-white/15" : "bg-accent/10 text-accent"}`}><t.icon size={16} /></span>
+                <span className="flex-1">{t.label}</span>
+                <span className={`inline-flex items-center gap-0.5 text-[11px] ${on ? "text-white/70" : "text-muted"}`}><Coins size={11} />0.5</span>
+              </button>
+            </Tip>
+          );
+        })}
       </div>
 
-      {error && <div className="mb-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[13px] text-danger">{error}</div>}
-      {!res && !busy && <Card className="p-6 text-[13px] text-muted">Pick a query to run it against the graph.</Card>}
-      {busy && <Card className="p-6 text-[13px] text-muted">Running…</Card>}
+      {error && <div role="alert" className="mb-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[13px] text-danger">{error}</div>}
+      {!res && !busy && <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Share2 size={20} />Pick a query</Card>}
+      {busy && <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Share2 size={20} className="animate-pulse" />Running…</Card>}
 
       {res && !busy && (
         <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
           <div>
-            <p className="mb-3 text-[13px] text-muted">{res.question}</p>
-            {res.rows.length === 0 && <Card className="p-4 text-[13px] text-muted">No matches in the current graph.</Card>}
+            <div className="mb-2 flex items-center gap-1.5 text-[12px] text-muted"><span className="font-semibold text-ink">{res.rows.length} results</span><InfoTip content={res.question} /></div>
+            {res.rows.length === 0 && <Card className="p-4 text-[13px] text-muted">No matches</Card>}
             <div className="space-y-2">
               {res.q === "warm" && (res.rows as WarmRow[]).map((r, i) => <WarmPath key={i} r={r} />)}
               {res.q === "hiring" && (res.rows as HiringRow[]).map((r, i) => <HiringCard key={i} r={r} />)}
               {res.q === "displacement" && (res.rows as DisplacementRow[]).map((r, i) => <DisplacementCard key={i} r={r} />)}
             </div>
           </div>
-          <Card className="h-fit p-4">
-            <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-muted">
-              <span className="font-semibold">Cypher</span>
-              <span className="font-mono normal-case">{res.engine} · {res.rows.length} rows · {res.ms.toFixed(1)} ms</span>
+          <Card className="h-fit overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-line px-3 py-2 text-[11px] text-muted">
+              <Code2 size={13} /><span className="font-semibold tracking-wider uppercase">Cypher</span>
+              <span className="ml-auto flex items-center gap-1">
+                <Badge tone={res.engine === "neo4j" ? "green" : "neutral"} title={res.engine === "memory" ? "Neo4j isn't connected, so the same query ran on the in-memory graph with the same row shape." : "Ran on Neo4j"}>{res.engine}</Badge>
+                <Badge icon={Timer}>{res.ms.toFixed(1)} ms</Badge>
+              </span>
             </div>
-            {res.fallback && <div className="mb-2 text-[12px] text-tier-b">{res.fallback}</div>}
-            <pre className="whitespace-pre-wrap break-words rounded-[6px] bg-ink p-3 font-mono text-[11px] leading-relaxed text-white">{res.cypher}</pre>
-            {res.engine === "memory" && <p className="mt-2 text-[12px] text-muted">Neo4j isn&apos;t connected, so the same query ran on the in-memory graph with the same row shape.</p>}
+            {res.fallback && <div className="px-3 pt-2 text-[12px] text-tier-b">{res.fallback}</div>}
+            <pre className="max-h-[420px] overflow-auto bg-ink p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words text-white">{res.cypher}</pre>
           </Card>
         </div>
       )}
@@ -87,12 +104,13 @@ export default function GraphPage() {
   );
 }
 
-function Node({ kind, children }: { kind: "team" | "via" | "person" | "company"; children: React.ReactNode }) {
+function Node({ kind, children, school }: { kind: "team" | "via" | "person" | "company"; children: React.ReactNode; school?: boolean }) {
   const tone = { team: "border-accent/40 bg-accent/10", via: "border-line bg-paper", person: "border-rep/40 bg-rep/10", company: "border-line bg-white" }[kind];
-  return <div className={`rounded-[6px] border px-2.5 py-1.5 text-[12px] ${tone}`}>{children}</div>;
+  const I = { team: Users, via: school ? GraduationCap : Building2, person: User, company: Building2 }[kind];
+  return <div className={`flex items-center gap-2 rounded-[8px] border px-2.5 py-1.5 text-[12px] ${tone}`}><I size={14} className="shrink-0 opacity-70" /><div className="leading-tight">{children}</div></div>;
 }
 const Arrow = ({ label }: { label: string }) => (
-  <div className="flex flex-col items-center px-1 text-[10px] text-muted"><span className="font-mono">{label}</span><span aria-hidden>→</span></div>
+  <Tip content={label}><span className="flex items-center px-0.5 text-muted" aria-label={label}><span className="h-px w-4 bg-line" /><span aria-hidden className="text-[10px]">▶</span></span></Tip>
 );
 
 function WarmPath({ r }: { r: WarmRow }) {
@@ -102,12 +120,12 @@ function WarmPath({ r }: { r: WarmRow }) {
       <div className="flex flex-wrap items-center gap-1">
         <Node kind="team"><div className="font-medium">{r.team}</div><div className="text-muted">{r.teamRole}</div></Node>
         <Arrow label={rel} />
-        <Node kind="via"><div className="text-[10px] uppercase text-muted">{r.viaLabel}</div><div className="font-medium">{r.via}</div></Node>
+        <Node kind="via" school={r.viaLabel === "School"}><div className="font-medium">{r.via}</div><div className="text-[10px] text-muted">{r.viaLabel}</div></Node>
         <Arrow label={rel} />
         <Node kind="person"><div className="font-medium">{r.person}</div><div className="text-muted">{r.title}</div></Node>
         <Arrow label="works_at" />
         <Node kind="company"><div className="font-medium">{r.company}</div><div className="text-muted">Tier {r.tier}</div></Node>
-        {r.isBuyer && <Badge tone="green" title="This person is the lead's buyer">buyer</Badge>}
+        {r.isBuyer && <span className="ml-1"><Badge tone="green" icon={Handshake} title="This person is the lead's buyer">buyer</Badge></span>}
       </div>
     </Card>
   );
@@ -116,10 +134,11 @@ function WarmPath({ r }: { r: WarmRow }) {
 function HiringCard({ r }: { r: HiringRow }) {
   return (
     <Card className="p-3 text-[13px]">
-      <div className="flex items-center gap-2"><span className="font-medium">{r.company}</span><Badge>Tier {r.tier}</Badge>{r.buyer && <span className="text-muted">Buyer: {r.buyer}, {r.buyerTitle}</span>}</div>
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        <div><div className="text-[11px] uppercase tracking-wider text-muted">Hiring</div><a href={r.hiringUrl} target="_blank" rel="noreferrer" className="hover:underline">{r.hiring}</a></div>
-        <div><div className="text-[11px] uppercase tracking-wider text-muted">Evaluation trigger</div>{r.evaluation.map((e) => <div key={e}>{e}</div>)}</div>
+      <div className="flex flex-wrap items-center gap-2"><Building2 size={14} className="text-muted" /><span className="font-medium">{r.company}</span><Badge>Tier {r.tier}</Badge>{r.buyer && <Badge icon={User} tone="blue" title={r.buyerTitle}>{r.buyer}</Badge>}</div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+        <a href={r.hiringUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-[6px] bg-rep/10 px-2 py-1 text-rep hover:underline"><Briefcase size={12} />{r.hiring}</a>
+        <span className="text-muted">▶</span>
+        {r.evaluation.map((e) => <span key={e} className="inline-flex items-center gap-1 rounded-[6px] bg-tier-b/10 px-2 py-1 text-tier-b"><Lightbulb size={12} />{e}</span>)}
       </div>
     </Card>
   );
@@ -129,13 +148,15 @@ function DisplacementCard({ r }: { r: DisplacementRow }) {
   return (
     <Card className="p-3 text-[13px]">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium">{r.company}</span><Badge>Tier {r.tier}</Badge>
-        <span className="text-muted">uses</span><Badge tone="red">{r.competitor}</Badge>
-        {r.renewal && <Badge tone="amber">renewal window</Badge>}
-        {r.buyer && <span className="text-muted">Buyer: {r.buyer}, {r.buyerTitle}</span>}
+        <Building2 size={14} className="text-muted" /><span className="font-medium">{r.company}</span><Badge>Tier {r.tier}</Badge>
+        <Badge tone="red" icon={Swords}>{r.competitor}</Badge>
+        {r.renewal && <Badge tone="amber" icon={CalendarClock}>renewal window</Badge>}
+        {r.buyer && <Badge icon={User} tone="blue" title={r.buyerTitle}>{r.buyer}</Badge>}
       </div>
-      <div className="mt-2">Evidence: <a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">{r.evidence}</a></div>
-      <div className="mt-1 text-muted">Our angle: {r.angle}</div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+        <Tip content={r.evidence}><a href={r.evidenceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-[5px] bg-accent/10 px-1.5 py-0.5 text-accent hover:underline"><ExternalLink size={11} />evidence</a></Tip>
+        <span className="inline-flex items-center gap-1 text-ink/80"><Lightbulb size={12} className="text-tier-a" />{r.angle}</span>
+      </div>
     </Card>
   );
 }

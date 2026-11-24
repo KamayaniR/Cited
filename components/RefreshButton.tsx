@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Button } from "@/components/ui";
+import { Button, Toast } from "@/components/ui";
+import { Tip } from "@/components/Tip";
 import { api } from "@/components/api";
 
 interface RefreshResult { processed: number; added: number; skippedForCredits: number; filtered: string[]; tierChanges: { name: string; from: string; to: string; score: number }[] }
@@ -17,15 +19,16 @@ export function RefreshButton({ variant = "secondary" }: { variant?: "primary" |
     try {
       const r = await api<RefreshResult>("/api/signals/refresh", { method: "POST", body: {} });
       const tiers = r.tierChanges.map((t) => `${t.name} ${t.from}→${t.to}`).join(", ");
-      setMsg(`${r.processed} refreshed, ${r.added} new signals${tiers ? `; ${tiers}` : ""}${r.filtered.length ? `; ${r.filtered.length} filtered` : ""}${r.skippedForCredits ? `; ${r.skippedForCredits} skipped (credits)` : ""}`);
+      setMsg(`${r.processed} refreshed · +${r.added} signals${tiers ? ` · ${tiers}` : ""}${r.filtered.length ? ` · ${r.filtered.length} filtered` : ""}${r.skippedForCredits ? ` · ${r.skippedForCredits} skipped (credits)` : ""}`);
     } catch (e) { setMsg((e as Error).message); }
     finally { setBusy(false); await refresh(); }
   };
   return (
     <span className="flex items-center gap-2">
-      {msg ? <span className="max-w-[360px] text-[12px] text-muted" role="status">{msg}</span>
-        : last && <span className="text-[12px] text-muted" title="Signals refresh every 6 hours for Tier A/B">Last refresh {new Date(last).toLocaleString()}</span>}
-      <Button variant={variant} onClick={run} disabled={busy || !ws?.companies.length} title="Re-pull signals for Tier A/B companies, re-score and re-tier. 0.2 credits per company.">{busy ? "Refreshing…" : "Run refresh now"}</Button>
+      {msg && <Toast>{msg}</Toast>}
+      <Tip content={`Re-pull signals for Tier A/B, re-score and re-tier. Runs every 6 hours; 0.2 credits per company.${last ? `\nLast refresh ${new Date(last).toLocaleString()}` : ""}`}>
+        <Button variant={variant} icon={RefreshCw} onClick={run} disabled={busy || !ws?.companies.length} className={busy ? "[&_svg]:animate-spin" : ""}>{busy ? "Refreshing…" : "Run refresh now"}</Button>
+      </Tip>
     </span>
   );
 }

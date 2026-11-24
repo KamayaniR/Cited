@@ -49,7 +49,7 @@ cp .env.example .env.local   # leave it empty for mock mode
 npm run dev
 ```
 
-Open http://localhost:3000 and click **Load demo data**. The seeded demo uses fictional `.example` companies and runs the same way every time.
+Open http://localhost:3000/overview and click **Load demo data**. The landing page is at http://localhost:3000. The seeded demo uses fictional `.example` companies and runs the same way every time.
 
 Every vendor sits behind an adapter with a mock fallback, so the whole app runs with no API keys. Add a vendor's keys to `.env.local` to switch just that vendor to live mode; the top bar shows which vendors are live. `CITED_FORCE_MOCK=true` forces mock mode even with keys set.
 

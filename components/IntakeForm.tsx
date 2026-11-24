@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Button, Card } from "./ui";
+import { Button, Card, Segmented } from "./ui";
+import { MessageCircle, FileText, Sparkles, Bot, Check, Loader2, SendHorizontal, Target } from "lucide-react";
 import { api } from "./api";
 import { DEMO_PRODUCT } from "@/lib/seed/fixtures";
 
@@ -68,10 +69,8 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<void> }) {
   return (
     <Card className="p-4">
       <div className="mb-3 flex items-center gap-2">
-        {(["chat", "form"] as const).map((m) => (
-          <button key={m} onClick={() => setMode(m)} className={`rounded-[6px] px-2.5 py-1 text-[12px] ${mode === m ? "bg-ink text-white" : "hover:bg-line/50"}`}>{m === "chat" ? "Chat" : "Form"}</button>
-        ))}
-        <button onClick={useExample} className="ml-auto text-[12px] text-accent hover:underline">Use example product</button>
+        <Segmented value={mode} onChange={setMode} options={[{ value: "chat", label: "Chat", icon: MessageCircle }, { value: "form", label: "Form", icon: FileText }]} />
+        <Button variant="ghost" icon={Sparkles} onClick={useExample} className="ml-auto text-accent">Use example</Button>
       </div>
 
       {mode === "chat" ? (
@@ -79,18 +78,18 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<void> }) {
           <div className="max-h-[420px] space-y-2 overflow-y-auto text-[13px]">
             {QUESTIONS.slice(0, Math.min(step + 1, QUESTIONS.length)).map((q, i) => (
               <div key={q.key} className="space-y-2">
-                <div className="max-w-[85%] rounded-[8px] bg-paper px-3 py-2">{q.q}</div>
-                {i < step && <div className="ml-auto max-w-[85%] rounded-[8px] bg-ink px-3 py-2 text-white">{form[q.key]}</div>}
+                <div className="flex items-start gap-2"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent/10 text-accent"><Bot size={13} /></span><div className="max-w-[85%] rounded-[10px] rounded-tl-[2px] bg-paper px-3 py-2">{q.q}</div></div>
+                {i < step && <div className="ml-auto w-fit max-w-[85%] rounded-[10px] rounded-tr-[2px] bg-ink px-3 py-2 text-white">{form[q.key]}</div>}
               </div>
             ))}
           </div>
           {step < QUESTIONS.length ? (
             <div className="mt-3 flex gap-2">
               <input className={inputCls} value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={(e) => e.key === "Enter" && answer()} placeholder="Type your answer and press Enter" autoFocus />
-              <Button onClick={answer} disabled={busy}>Send</Button>
+              <Button onClick={answer} disabled={busy} icon={SendHorizontal}>Send</Button>
             </div>
           ) : (
-            <div className="mt-3 text-[13px] text-muted">{busy ? "Inferring your ICP…" : error ? "" : "Done."}</div>
+            <div className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-muted">{busy ? <><Loader2 size={14} className="animate-spin" />Inferring your ICP…</> : error ? "" : <><Check size={14} className="text-tier-a" />Done</>}</div>
           )}
         </div>
       ) : (
@@ -102,7 +101,7 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<void> }) {
                 : <input className={`${inputCls} mt-1 text-ink`} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />}
             </label>
           ))}
-          <Button type="submit" disabled={busy || !form.name || form.description.length < 10}>{busy ? "Inferring ICP…" : "Infer ICP"}</Button>
+          <Button type="submit" icon={busy ? Loader2 : Target} disabled={busy || !form.name || form.description.length < 10}>{busy ? "Inferring ICP…" : "Infer ICP"}</Button>
         </form>
       )}
       {error && <div className="mt-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div>}

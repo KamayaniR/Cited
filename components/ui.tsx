@@ -40,7 +40,7 @@ export function ScoreRing({ tier, score, fit, intent, size = 34, muted }: { tier
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E5E5E5" strokeWidth={3} />
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={TIER_STROKE[tier]} strokeWidth={3} strokeLinecap="round" strokeDasharray={`${(c * Math.min(score, 100)) / 100} ${c}`} />
         </svg>
-        <span className="absolute text-[11px] leading-none font-semibold" style={{ color: TIER_STROKE[tier] }}>{tier}<span className="ml-px text-[9px] font-medium text-muted">{score}</span></span>
+        <span className="absolute text-[11px] leading-none font-semibold" style={{ color: TIER_STROKE[tier] }}>{tier}{size >= 32 && <span className="ml-px text-[9px] font-medium text-muted">{score}</span>}</span>
       </span>
     </Tip>
   );
@@ -193,5 +193,5 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
 
 /** A short status line that disappears into a chip. */
 export function Toast({ children, tone = "accent" }: { children: ReactNode; tone?: Tone }) {
-  return <div role="status" className={`mb-3 inline-flex max-w-full items-center gap-2 rounded-[6px] px-3 py-1.5 text-[12px] ${TONES[tone]}`}>{children}</div>;
+  return <div role="status" className={`inline-flex max-w-full items-center gap-2 rounded-[6px] px-3 py-1.5 text-[12px] ${TONES[tone]}`}>{children}</div>;
 }

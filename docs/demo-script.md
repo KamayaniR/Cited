@@ -1,6 +1,6 @@
 # Demo video script (target 2:50)
 
-Record in mock mode with the seeded demo so every take is identical: start the app with no keys (or `SENDING_ENABLED=false`), open http://localhost:3000, click **Load demo data**. Keep the Agent Thinking panel open throughout. Screen size 1440×900.
+Record in mock mode with the seeded demo so every take is identical: start the app with no keys (or `SENDING_ENABLED=false`), open http://localhost:3000/overview, click **Load demo data**. Keep the Agent Thinking panel open throughout. Screen size 1440×900.
 
 Before recording: open `docs/slides/viability.png` full screen for the first beat.
 
