@@ -65,9 +65,11 @@ export async function enrichCompany(icp: Icp, company: Company): Promise<EnrichR
   let email = h.email, emailStatus = h.status, mx = h.mx, emailSource: Source | null = h.email ? "hunter" : null;
   let linkedinUrl = h.linkedinUrl, linkedinSource: Source | null = h.linkedinUrl ? "hunter" : null;
 
-  if (!email || emailStatus === "invalid" || !linkedinUrl) {
-    calls.apollo++;
-    const a = await apollo.matchPerson({ firstName: contact.firstName, lastName: contact.lastName, domain: company.domain });
+  // Apollo fills what Hunter missed, and gives the career history the warm-path query needs.
+  calls.apollo++;
+  const a = await apollo.matchPerson({ firstName: contact.firstName, lastName: contact.lastName, domain: company.domain });
+  const history = { previouslyAt: a.previouslyAt, school: a.school, historySource: (a.previouslyAt.length || a.school ? a.source : null) as Source | null };
+  {
     if ((!email || emailStatus === "invalid") && a.email && a.email !== email) {
       calls.hunter++;
       const v = await hunter.verifyEmail(a.email);
@@ -82,7 +84,7 @@ export async function enrichCompany(icp: Icp, company: Company): Promise<EnrichR
     person: {
       id: newId("per"), companyId: company.id, name: `${contact.firstName} ${contact.lastName}`, title: contact.position, seniority: contact.seniority,
       email, emailStatus: email ? emailStatus : emailStatus === "invalid" ? "invalid" : "unknown", emailSource, mx,
-      linkedinUrl, linkedinSource, personaMatch: Number(pick.personaMatch.toFixed(2)),
+      linkedinUrl, linkedinSource, personaMatch: Number(pick.personaMatch.toFixed(2)), ...history,
     },
   };
 }

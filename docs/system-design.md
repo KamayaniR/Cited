@@ -37,3 +37,35 @@ Per company, best score first, with a 2-credit check before each lead: Hunter Co
 - Closed/Lost requires `outcome` won or lost (400 otherwise) and takes an optional reason, stored as `lead.closeReason`. Moving a closed lead back out clears both.
 - `GET /api/analytics?groupBy=industry|tier|variant` (`lib/pipeline/analytics.ts`). Reached stages come from history and are cumulative for open stages, so a lead dragged straight to Meeting Booked still counts as contacted and replied. Reply and meeting rates are over contacted leads; win rate is over closed leads.
 - The audit log page filters by actor and action.
+
+## Knowledge graph (P4)
+
+Ontology (`lib/graph/model.ts`, schema in `lib/graph/schema.cypher`). Node ids equal record ids.
+
+| Nodes | Edges |
+|---|---|
+| Company, Person, Product, Competitor, Signal, Team, School | works_at, competes_with, matched_to, contacted_via, replied_to, previously_employed_at, has_signal, uses, studied_at |
+
+- **Team** comes from the intake's team background (`lib/pipeline/team.ts`: LLM extraction, heuristic parse in mock mode). **Person** career history (past employers, school) comes from Apollo employment history during enrichment, with its source recorded.
+- Past employers that aren't prospects become `Company` nodes with id `org_<slug>`; spelling variants ("Stratus Data, Inc.") collapse to one node.
+- `uses` is derived from signals that name a non-status-quo competitor; `renewal` is set when the signal mentions a renewal.
+- **Engine.** With `NEO4J_*` set, the graph is mirrored to Neo4j after discovery, enrichment, refresh and seeding (delete this org's nodes, then batched `UNWIND … MERGE` per label and edge type), and queries run as Cypher scoped by `$org`. Without keys, or if Neo4j fails, the same query runs over the in-memory graph with the same row shape, and the response says which engine answered.
+
+### The three queries (`lib/graph/queries.ts`, `GET /api/graph/query?q=`; 1 credit each)
+
+1. **Warm path**: `(Team)-[previously_employed_at|studied_at]->(x)<-[same]-(Person)-[works_at]->(Company)`. Demo: Maya Chen → Stratus Data → Priya Natarajan (VP Finance, Northwind, the lead's buyer).
+2. **Hiring → evaluation**: a company with a `hiring` signal and at least one evaluation trigger (tech adoption, funding, leadership change, expansion), with the lead's buyer. Demo: Northwind (finance data hiring + Series C).
+3. **Competitor displacement**: `(Product)-[competes_with]->(Competitor)<-[uses]-(Company)`, joined to the signal that proves it, renewal windows first, with our advantage as the angle. Demo: Corvid Robotics on FloQast, renewing in Q1.
+
+Excluded companies never appear in any query.
+
+## Signal refresh (P4)
+
+`lib/pipeline/refresh.ts`, called by `GET /api/cron/refresh` (Vercel Cron every 6 h, `CRON_SECRET`) and the "Run refresh now" button (`POST /api/signals/refresh`).
+
+1. Queue: Tier A/B (or the given ids), oldest refresh first, max 50.
+2. Per company: credit check (1 credit; out of credits → skipped and counted, never a 402 for cron) → fetch fresh signals (live: Tavily + LLM, only results on the company's site, naming its domain, or its full name; demo `.example` companies use fixtures) → add only new, cited signals → negative filter. A new negative signal marks the company filtered and withdraws its unsent drafts, with audit entries.
+3. Moss re-index, semantic trigger matching, re-score and re-tier. Every tier change is audited (`tier_changed`). Demo: Halcyon gets a growth round and moves Tier B → A.
+4. Graph mirror.
+
+Demo seed scores now come from the same fit/intent formula, so a refresh only moves a score when the signals change.

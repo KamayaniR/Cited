@@ -22,7 +22,7 @@ export const env = {
   neo4jPassword: process.env.NEO4J_PASSWORD,
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  cronSecret: process.env.CRON_SECRET,
+  get cronSecret() { return process.env.CRON_SECRET; },
   demoRecipient: process.env.DEMO_RECIPIENT,
   sendingEnabled: process.env.SENDING_ENABLED === "true",
   forceMock: process.env.CITED_FORCE_MOCK === "true",

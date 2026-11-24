@@ -13,7 +13,9 @@ export async function search(query: string, opts: { maxResults?: number; include
       .map((r) => ({ r, n: words.filter((w) => (r.title + " " + r.content).toLowerCase().includes(w)).length }))
       .filter((x) => x.n > 0)
       .sort((a, b) => b.n - a.n);
-    const hits = scored.map((x) => x.r);
+    // Like a real engine, show one result per site so one company's many pages don't crowd out the rest.
+    const seenHost = new Set<string>();
+    const hits = scored.map((x) => x.r).filter((r) => { const h = new URL(r.url).host; if (seenHost.has(h)) return false; seenHost.add(h); return true; });
     const scoped = opts.includeDomains ? MOCK_SEARCH_RESULTS.filter((r) => opts.includeDomains!.some((d) => r.url.includes(d))) : (hits.length ? hits : MOCK_SEARCH_RESULTS);
     return { results: scoped.slice(0, opts.maxResults ?? 8), mode: "mock" };
   }

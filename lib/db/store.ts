@@ -16,7 +16,7 @@ export function emptyWorkspace(): Workspace {
   return {
     org: { id: "org_demo", name: "Demo workspace", creditsBalance: STARTING_CREDITS },
     product: null, icp: null, expansions: [], companies: [], citations: [], signals: [], people: [],
-    competitors: [], leads: [], leadEvents: [], messages: [], auditLog: [], usageEvents: [], agentEvents: [], approvals: [],
+    competitors: [], team: [], leads: [], leadEvents: [], messages: [], auditLog: [], usageEvents: [], agentEvents: [], approvals: [],
   };
 }
 

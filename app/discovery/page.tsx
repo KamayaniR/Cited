@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { api } from "@/components/api";
 import { Button } from "@/components/ui";
+import { RefreshButton } from "@/components/RefreshButton";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Badge, Card, PageTitle, SourceBadge, TierBadge } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
@@ -26,6 +27,7 @@ function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
       {error && <span className="text-[12px] text-danger">{error}</span>}
       {!ready && <span className="text-[12px] text-muted">Approve the ICP first</span>}
       <Button variant={ws?.companies.length ? "secondary" : "primary"} onClick={run} disabled={busy || !ready}>{busy ? "Discovering…" : "Run discovery"}</Button>
+      {Boolean(ws?.companies.length) && <RefreshButton />}
       {Boolean(ws?.companies.length) && <EnrichButton />}
     </div>
   );

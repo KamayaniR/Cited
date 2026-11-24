@@ -28,7 +28,9 @@ describe("enrichment fallback", () => {
     expect(r.hqSource).toBe("hunter");
     expect(r.person?.name).toBe("Priya Natarajan");
     expect(r.person?.emailSource).toBe("hunter");
-    expect(r.calls.apollo).toBe(0);
+    // Apollo is still called once, but only for the career history (warm paths), not contact fields.
+    expect(r.calls.apollo).toBe(1);
+    expect(r.person?.previouslyAt).toEqual(["Stratus Data"]);
   });
   it("never keeps an invalid email", async () => {
     const r = await enrichCompany(DEMO_ICP, co("tessellate-retail.example"));

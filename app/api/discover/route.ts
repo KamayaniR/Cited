@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mirrorGraph } from "@/lib/graph/run";
 import { getWorkspace, mutate, audit, agentEvent } from "@/lib/db/store";
 import { runDiscovery, MAX_QUERIES } from "@/lib/pipeline/discovery";
 import { ApiError, route } from "@/lib/api/errors";
@@ -48,7 +49,8 @@ export const POST = route(async () => {
   const final = getWorkspace();
   out.companies = final.companies;
 
-  return NextResponse.json({
+  const graph = await mirrorGraph(final);
+  return NextResponse.json({ graph,
     moss: { indexed: indexed.count, triggerMatches: tm.matches.size, ms: tm.ms },
     companies: out.companies.filter((c) => !c.excluded),
     filtered: out.companies.filter((c) => c.excluded),

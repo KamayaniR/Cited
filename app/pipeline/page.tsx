@@ -95,6 +95,7 @@ function LeadCard({ ws, lead, dragging, onDragStart, onOpen, onMove }: {
           <TierBadge tier={c.tier} score={c.score} />
           <ActorTag actor={lead.owner} />
           <Badge title="A/B variant">{lead.variant}</Badge>
+          {c.excluded && <Badge tone="red" title={c.excludeReason ?? ""}>filtered</Badge>}
           {lead.stage === "closed_lost" && lead.outcome && <Badge tone={lead.outcome === "won" ? "green" : "red"}>{lead.outcome}</Badge>}
         </div>
         {lead.closeReason && <div className="mt-1.5 text-[11px] text-muted">{lead.closeReason}</div>}

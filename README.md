@@ -84,8 +84,8 @@ vercel.json          cron schedule
 | P2 | Enrichment, sequences, HITL queue, demo-inbox send, manual LinkedIn | Done |
 | Moss | Evidence memory, grounded drafting, claim check, evidence search, semantic triggers, Moss Inference | Done |
 | P3 | Kanban, attribution, audit, analytics | Done |
-| P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | Next |
-| P5 | Flexprice metering and credit gate | |
+| P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | Done (in-memory until Neo4j keys are set) |
+| P5 | Flexprice metering and credit gate | Next |
 | P6 | Band agents and approval cards | |
 | P7 | Pitch slide, docs, demo video | |
 | P8 | Snyk, E2E, monitoring | |

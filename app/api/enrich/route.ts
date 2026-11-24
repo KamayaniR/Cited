@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mirrorGraph } from "@/lib/graph/run";
 import { z } from "zod";
 import { getWorkspace, mutate, audit, agentEvent } from "@/lib/db/store";
 import { enrichCompany, enrichQueue, applyEnrichment, ENRICH_CREDITS } from "@/lib/pipeline/enrich";
@@ -42,5 +43,6 @@ export const POST = route(async (req: Request) => {
   }
 
   mutate((ws) => agentEvent(ws, { from: "builder", to: "planner", kind: "result", text: `Enriched ${enriched} leads (${noBuyer} without a matching buyer). Calls: hunter ${sources.hunter}, apollo ${sources.apollo}` }));
-  return NextResponse.json({ enriched, noBuyer, gated: false, sources });
+  const graph = await mirrorGraph(getWorkspace());
+  return NextResponse.json({ graph, enriched, noBuyer, gated: false, sources });
 });

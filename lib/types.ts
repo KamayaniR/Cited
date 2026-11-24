@@ -73,7 +73,11 @@ export interface Person {
   id: string; companyId: string; name: string; title: string; seniority: string;
   email: string | null; emailStatus: z.infer<typeof EmailStatusEnum>; emailSource: Source | null; mx: boolean;
   linkedinUrl: string | null; linkedinSource: Source | null; personaMatch: number;
+  /** Career history for warm paths (Apollo employment history, or mock). */
+  previouslyAt?: string[]; school?: string | null; historySource?: Source | null;
 }
+/** The founder's own team, parsed from the intake team background; the start of every warm path. */
+export interface TeamMember { id: string; name: string; role: string; previouslyAt: string[]; school: string | null }
 export interface Competitor { id: string; name: string; domain: string; category: "direct" | "adjacent" | "status_quo"; positioning: string; pricing: string; ourAdvantage: string; sourceUrl: string }
 export interface Lead { id: string; companyId: string; personId: string; stage: Stage; outcome: "won" | "lost" | null; closeReason?: string | null; owner: Actor; variant: "A" | "B" }
 export interface LeadEvent { id: string; leadId: string; fromStage: Stage | null; toStage: Stage; actor: Actor; note: string; at: string }
@@ -101,6 +105,7 @@ export interface Workspace {
   people: Person[];
   competitors: Competitor[];
   leads: Lead[];
+  team: TeamMember[];
   leadEvents: LeadEvent[];
   messages: Message[];
   auditLog: AuditEntry[];

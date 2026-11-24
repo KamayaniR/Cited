@@ -22,11 +22,12 @@ async function post(path: string, body: Record<string, unknown>) {
 export async function matchPerson(p: { firstName: string; lastName: string; domain: string }) {
   if (!isLive("apollo")) {
     const m = mockPersonContact(p.domain, p.firstName, p.lastName);
-    return { email: m.apolloEmail, linkedinUrl: m.apolloLinkedin, source: "mock" as const };
+    return { email: m.apolloEmail, linkedinUrl: m.apolloLinkedin, previouslyAt: m.previouslyAt, school: m.school, source: "mock" as const };
   }
   const r = await post("/people/match", { first_name: p.firstName, last_name: p.lastName, domain: p.domain, reveal_personal_emails: false });
-  const person = r.person as { email?: string; linkedin_url?: string } | undefined;
-  return { email: person?.email ?? null, linkedinUrl: person?.linkedin_url ?? null, source: "apollo" as const };
+  const person = r.person as { email?: string; linkedin_url?: string; employment_history?: { organization_name?: string; current?: boolean }[] } | undefined;
+  const previouslyAt = [...new Set((person?.employment_history ?? []).filter((e) => !e.current && e.organization_name).map((e) => e.organization_name!))].slice(0, 5);
+  return { email: person?.email ?? null, linkedinUrl: person?.linkedin_url ?? null, previouslyAt, school: null as string | null, source: "apollo" as const };
 }
 
 export async function enrichOrg(domain: string) {

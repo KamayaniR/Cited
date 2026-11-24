@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { mirrorGraph } from "@/lib/graph/run";
 import { replaceWorkspace, emptyWorkspace } from "@/lib/db/store";
 import { buildDemoWorkspace } from "@/lib/seed/demo";
 import { route } from "@/lib/api/errors";
@@ -13,7 +14,8 @@ export const POST = route(async () => {
   replaceWorkspace(ws);
   resetMockIndex();
   const indexed = await syncEvidence(ws);
-  return NextResponse.json({ ok: true, evidenceIndexed: indexed.count, companies: ws.companies.length, leads: ws.leads.length });
+  const graph = await mirrorGraph(ws);
+  return NextResponse.json({ graph, ok: true, evidenceIndexed: indexed.count, companies: ws.companies.length, leads: ws.leads.length });
 });
 
 /** DELETE /api/demo/seed: reset to an empty workspace. */

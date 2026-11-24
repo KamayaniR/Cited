@@ -1,7 +1,7 @@
 import type { Workspace, Company, Person, Lead, Message, Signal, Citation, Source, Stage, Actor } from "@/lib/types";
 import { emptyWorkspace } from "@/lib/db/store";
-import { combineScore, tierFor } from "@/lib/pipeline/scoring";
-import { DEMO_COMPANIES, DEMO_COMPETITORS, DEMO_ICP, DEMO_PRODUCT, mockPersonContact } from "./fixtures";
+import { combineScore, tierFor, fitScore, intentScore } from "@/lib/pipeline/scoring";
+import { DEMO_COMPANIES, DEMO_COMPETITORS, DEMO_ICP, DEMO_PRODUCT, DEMO_TEAM, mockPersonContact } from "./fixtures";
 
 /**
  * Deterministic demo workspace (mock mode). Built so every invariant the real pipeline enforces
@@ -13,6 +13,7 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
   const at = (minAgo: number) => new Date(now.getTime() - minAgo * 60_000).toISOString();
 
   ws.product = { id: "prod_ledgerlight", ...DEMO_PRODUCT };
+  ws.team = DEMO_TEAM.map((t) => ({ ...t, previouslyAt: [...t.previouslyAt] }));
   ws.icp = {
     id: "icp_1", version: 1, approvedAt: at(50),
     data: DEMO_ICP,
@@ -57,9 +58,18 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
         id: `per_${dc.key}_${i}`, companyId: id, name: `${p.first} ${p.last}`, title: p.title, seniority: p.seniority,
         email, emailStatus: hunterOk ? p.hunterStatus : email ? "valid" : "unknown", emailSource, mx: Boolean(email),
         linkedinUrl: linkedin, linkedinSource, personaMatch: p.seniority === "c_level" || p.seniority === "vp" ? 0.9 : 0.8,
+        previouslyAt: p.previouslyAt ? [p.previouslyAt] : [], school: p.school ?? null, historySource: p.previouslyAt || p.school ? "apollo" : null,
       };
       ws.people.push(person);
     });
+  }
+
+  // Scores come from the same formula the pipeline uses, so a refresh never moves them for no reason.
+  for (const c of ws.companies) {
+    c.fitScore = fitScore(DEMO_ICP, c);
+    c.intentScore = intentScore(DEMO_ICP, ws.signals.filter((s) => s.companyId === c.id), now);
+    c.score = combineScore(c.fitScore, c.intentScore);
+    c.tier = tierFor(c.score);
   }
 
   ws.competitors = DEMO_COMPETITORS.map((c, i) => ({ id: `cmp_${i}`, ...c, sourceUrl: `https://${c.domain}/` }));

@@ -8,7 +8,7 @@ export interface DemoCompany {
   key: string; name: string; domain: string; industry: string; naics: string; headcount: number; region: string;
   hunterHq: string | null; apolloHq: string | null;
   signals: { type: "hiring" | "funding" | "launch" | "leadership_change" | "tech_adoption" | "expansion" | "negative"; summary: string; path: string }[];
-  people: { first: string; last: string; title: string; seniority: string; hunterEmail: boolean; hunterStatus: "valid" | "accept_all" | "invalid" | "unknown"; hunterLinkedin: boolean; apolloEmail: boolean; apolloLinkedin: boolean; previouslyAt?: string }[];
+  people: { first: string; last: string; title: string; seniority: string; hunterEmail: boolean; hunterStatus: "valid" | "accept_all" | "invalid" | "unknown"; hunterLinkedin: boolean; apolloEmail: boolean; apolloLinkedin: boolean; previouslyAt?: string; school?: string }[];
   fit: number; intent: number; excludeReason?: string;
 }
 
@@ -46,8 +46,8 @@ export const DEMO_ICP = {
 };
 
 export const DEMO_TEAM = [
-  { id: "team_maya", name: "Maya Chen", role: "Co-founder, CEO", previouslyAt: "Stratus Data", school: "UC Berkeley" },
-  { id: "team_arjun", name: "Arjun Rao", role: "Co-founder, CTO", previouslyAt: "Plaid", school: "Carnegie Mellon" },
+  { id: "team_maya", name: "Maya Chen", role: "Co-founder, CEO", previouslyAt: ["Stratus Data"], school: "UC Berkeley" },
+  { id: "team_arjun", name: "Arjun Rao", role: "Co-founder, CTO", previouslyAt: ["Plaid"], school: "Carnegie Mellon" },
 ];
 
 export const DEMO_COMPANIES: DemoCompany[] = [
@@ -59,7 +59,7 @@ export const DEMO_COMPANIES: DemoCompany[] = [
       { type: "funding", summary: "Raised a $45M Series C to expand into the UK", path: "/news/series-c" },
     ],
     people: [
-      { first: "Priya", last: "Natarajan", title: "VP Finance", seniority: "vp", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: true, apolloEmail: true, apolloLinkedin: true, previouslyAt: "Stratus Data" },
+      { first: "Priya", last: "Natarajan", title: "VP Finance", seniority: "vp", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: true, apolloEmail: true, apolloLinkedin: true, previouslyAt: "Stratus Data", school: "University of Michigan" },
       { first: "Tom", last: "Becker", title: "Controller", seniority: "director", hunterEmail: true, hunterStatus: "accept_all", hunterLinkedin: false, apolloEmail: true, apolloLinkedin: true },
     ],
   },
@@ -79,13 +79,16 @@ export const DEMO_COMPANIES: DemoCompany[] = [
     headcount: 900, region: "United States", hunterHq: "Nashville, TN, US", apolloHq: "Nashville, Tennessee, United States", fit: 72, intent: 61,
     signals: [{ type: "expansion", summary: "Acquired two clinic groups, adding 4 legal entities", path: "/news/acquisition" }],
     people: [
-      { first: "Marcus", last: "Hale", title: "Corporate Controller", seniority: "director", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: true, apolloEmail: true, apolloLinkedin: true },
+      { first: "Marcus", last: "Hale", title: "Corporate Controller", seniority: "director", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: true, apolloEmail: true, apolloLinkedin: true, previouslyAt: "Plaid" },
     ],
   },
   {
     key: "corvid", name: "Corvid Robotics", domain: "corvid-robotics.example", industry: "Industrial machinery manufacturing", naics: "333249",
     headcount: 380, region: "United States", hunterHq: "Pittsburgh, PA, US", apolloHq: "Pittsburgh, Pennsylvania, United States", fit: 64, intent: 70,
-    signals: [{ type: "hiring", summary: "Hiring a Head of FP&A to prepare for audit", path: "/jobs/head-of-fpa" }],
+    signals: [
+      { type: "hiring", summary: "Hiring a Head of FP&A to prepare for audit", path: "/jobs/head-of-fpa" },
+      { type: "tech_adoption", summary: "Finance team runs its close on FloQast; the contract is up for renewal in Q1", path: "/blog/finance-stack" },
+    ],
     people: [
       { first: "Elena", last: "Sousa", title: "Head of Finance", seniority: "director", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: false, apolloEmail: true, apolloLinkedin: false },
     ],
@@ -103,7 +106,7 @@ export const DEMO_COMPANIES: DemoCompany[] = [
     headcount: 260, region: "United States", hunterHq: "Cambridge, MA, US", apolloHq: "Cambridge, Massachusetts, United States", fit: 52, intent: 38,
     signals: [{ type: "funding", summary: "Closed $30M Series B", path: "/news/series-b" }],
     people: [
-      { first: "Grace", last: "Liu", title: "Controller", seniority: "director", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: true, apolloEmail: true, apolloLinkedin: true },
+      { first: "Grace", last: "Liu", title: "Controller", seniority: "director", hunterEmail: true, hunterStatus: "valid", hunterLinkedin: true, apolloEmail: true, apolloLinkedin: true, previouslyAt: "Deloitte", school: "Carnegie Mellon" },
     ],
   },
   {
@@ -157,6 +160,8 @@ export function mockPersonContact(domain: string, first: string, last: string) {
     hunterLinkedin: p?.hunterLinkedin ? li : null,
     apolloEmail: p?.apolloEmail ? email : null,
     apolloLinkedin: p?.apolloLinkedin ? li : null,
+    previouslyAt: p?.previouslyAt ? [p.previouslyAt] : [],
+    school: p?.school ?? null,
   };
 }
 
@@ -164,3 +169,12 @@ export function mockCompanyInfo(domain: string) {
   const c = DEMO_COMPANIES.find((x) => x.domain === domain);
   return { hunterHq: c?.hunterHq ?? null, apolloHq: c?.apolloHq ?? null };
 }
+
+/**
+ * Mock "fresh" news for the scheduled signal refresh. Halcyon gets a funding round that pushes it
+ * from Tier B to Tier A (spec scenario "Scheduled refresh re-tiers a company").
+ */
+export const MOCK_REFRESH_SIGNALS: Record<string, { type: DemoCompany["signals"][number]["type"]; summary: string; path: string }[]> = {
+  "halcyon-health.example": [{ type: "funding", summary: "Raised $60M growth round to fund further clinic acquisitions", path: "/news/growth-round" }],
+  "brightpath-logistics.example": [{ type: "expansion", summary: "Opened a UK subsidiary in Manchester", path: "/news/uk-subsidiary" }],
+};
