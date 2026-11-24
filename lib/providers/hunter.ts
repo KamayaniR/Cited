@@ -1,7 +1,7 @@
 import "server-only";
 import { env, isLive } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
-import { mockPersonContact, mockCompanyInfo } from "@/lib/seed/fixtures";
+import { mockPersonContact, mockCompanyInfo, DEMO_COMPANIES } from "@/lib/seed/fixtures";
 
 const BASE = "https://api.hunter.io/v2";
 type Status = "valid" | "accept_all" | "invalid" | "unknown";
@@ -48,4 +48,20 @@ export async function enrichCompany(domain: string): Promise<HunterCompany> {
   const geo = c?.geo as { city?: string; state?: string; country?: string } | undefined;
   const hq = geo ? [geo.city, geo.state, geo.country].filter(Boolean).join(", ") || null : null;
   return { domain, hq, source: "hunter" };
+}
+
+export interface HunterContact { firstName: string; lastName: string; position: string; seniority: string }
+
+/** Domain Search: people at a company (names and titles). Used to pick the buyer before Email Finder. */
+export async function domainSearch(domain: string): Promise<{ contacts: HunterContact[]; source: "hunter" | "mock" }> {
+  if (!isLive("hunter")) {
+    const c = DEMO_COMPANIES.find((x) => x.domain === domain);
+    return { contacts: (c?.people ?? []).map((p) => ({ firstName: p.first, lastName: p.last, position: p.title, seniority: p.seniority })), source: "mock" };
+  }
+  const d = await get("/domain-search", { domain, limit: "10", type: "personal" });
+  const emails = (d?.emails as { first_name?: string; last_name?: string; position?: string; seniority?: string }[] | undefined) ?? [];
+  return {
+    contacts: emails.filter((e) => e.first_name && e.last_name).map((e) => ({ firstName: e.first_name!, lastName: e.last_name!, position: e.position ?? "", seniority: e.seniority ?? "" })),
+    source: "hunter",
+  };
 }

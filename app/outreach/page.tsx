@@ -1,44 +1,69 @@
 "use client";
+import { useState } from "react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Badge, Card, PageTitle } from "@/components/ui";
-import { EmptyState } from "@/components/EmptyState";
-import { StageNote } from "@/components/StageNote";
+import { Badge, Button, Card, PageTitle, TierBadge } from "@/components/ui";
+import { MessageCard } from "@/components/MessageCard";
+import { api } from "@/components/api";
+
+const FILTERS = [
+  { key: "open", label: "Needs review", match: (s: string) => s === "pending_approval" || s === "needs_fix" },
+  { key: "linkedin", label: "LinkedIn to send", match: (s: string, ch: string) => ch === "linkedin" && s === "approved" },
+  { key: "all", label: "All", match: () => true },
+] as const;
 
 export default function OutreachPage() {
-  const { ws } = useWorkspace();
-  const pending = ws?.messages.filter((m) => m.status === "pending_approval") ?? [];
-  if (!ws || !ws.messages.length) return (<div><PageTitle kicker="Approval queue" title="Nothing sends without you" /><EmptyState what="drafts" /></div>);
-  const byLead = Object.groupBy(pending, (m) => m.leadId);
+  const { ws, refresh } = useWorkspace();
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("open");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const undrafted = ws ? ws.leads.filter((l) => l.stage === "matched" && !ws.messages.some((m) => m.leadId === l.id)).length : 0;
+  const generate = async () => {
+    setBusy(true); setMsg(null);
+    try { const r = await api<{ messages: unknown[]; batch: string | null }>("/api/outreach/generate", { method: "POST", body: {} }); setMsg(`Batch ${r.batch}: ${r.messages.length} messages drafted, reviewed and security-checked`); }
+    catch (e) { setMsg((e as Error).message); }
+    finally { setBusy(false); await refresh(); }
+  };
+
+  const f = FILTERS.find((x) => x.key === filter)!;
+  const msgs = ws?.messages.filter((m) => f.match(m.status, m.channel)) ?? [];
+  const byLead = Object.groupBy(msgs, (m) => m.leadId);
+  const counts = { open: ws?.messages.filter((m) => FILTERS[0].match(m.status)).length ?? 0, linkedin: ws?.messages.filter((m) => FILTERS[1].match(m.status, m.channel)).length ?? 0 };
+
   return (
     <div>
-      <PageTitle kicker="Approval queue" title="Nothing sends without you"><Badge tone="amber">{pending.length} awaiting approval</Badge></PageTitle>
-      <StageNote stage="P2">Approve, edit and reject, the demo-inbox send and the manual LinkedIn flow are built in P2. Drafts are read-only here.</StageNote>
-      {Object.entries(byLead).map(([leadId, msgs]) => {
+      <PageTitle kicker="Approval queue" title="Nothing sends without you">
+        <div className="flex items-center gap-3">
+          {msg && <span className="text-[12px] text-muted">{msg}</span>}
+          <Button onClick={generate} disabled={busy || undrafted === 0}>{busy ? "Drafting…" : undrafted ? `Draft sequences for ${undrafted} leads` : "All leads drafted"}</Button>
+        </div>
+      </PageTitle>
+      <div className="mb-4 flex gap-1.5">
+        {FILTERS.map((x) => (
+          <button key={x.key} onClick={() => setFilter(x.key)} className={`rounded-[6px] px-2.5 py-1 text-[12px] ${filter === x.key ? "bg-ink text-white" : "hover:bg-line/50"}`}>
+            {x.label}{x.key !== "all" && <span className="ml-1 font-mono">{counts[x.key]}</span>}
+          </button>
+        ))}
+      </div>
+      {!ws?.messages.length && <Card className="p-8 text-center text-[13px] text-muted">No drafts yet. Enrich leads on Discovery, then draft sequences here.</Card>}
+      {ws && Object.entries(byLead).map(([leadId, ms]) => {
         const lead = ws.leads.find((l) => l.id === leadId)!;
         const company = ws.companies.find((c) => c.id === lead.companyId)!;
         const person = ws.people.find((p) => p.id === lead.personId)!;
+        const signals = ws.signals.filter((s) => s.companyId === company.id);
         return (
           <Card key={leadId} className="mb-4 p-4">
-            <div className="mb-3 flex items-center gap-2 text-[13px]"><span className="font-medium">{person.name}</span><span className="text-muted">{person.title}, {company.name}</span><Badge>variant {lead.variant}</Badge></div>
-            <div className="grid grid-cols-3 gap-3">
-              {msgs!.sort((a, b) => a.dayOffset - b.dayOffset).map((m) => {
-                const sig = ws.signals.filter((s) => m.signalIds.includes(s.id));
-                return (
-                  <div key={m.id} className="rounded-[6px] border border-line p-3 text-[12px]">
-                    <div className="mb-2 flex items-center gap-1.5">
-                      <Badge tone={m.channel === "email" ? "neutral" : "blue"}>{m.channel} · touch {m.step} · day {m.dayOffset}</Badge>
-                      {m.channel === "linkedin" && <Badge tone="amber">LinkedIn: send manually</Badge>}
-                    </div>
-                    {m.subject && <div className="font-medium">{m.subject}</div>}
-                    <p className="mt-1 whitespace-pre-line">{m.body}</p>
-                    {sig.map((s) => <a key={s.id} href={s.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 block text-accent hover:underline">Signal: {s.summary}</a>)}
-                  </div>
-                );
-              })}
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
+              <span className="font-medium">{person.name}</span><span className="text-muted">{person.title}, {company.name}</span>
+              <TierBadge tier={company.tier} score={company.score} /><Badge>variant {lead.variant}</Badge><Badge tone={lead.stage === "matched" ? "neutral" : "green"}>{lead.stage.replace("_", " ")}</Badge>
+            </div>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              {ms!.sort((a, b) => a.step - b.step).map((m) => <MessageCard key={m.id} m={m} person={person} signals={signals} refresh={refresh} />)}
             </div>
           </Card>
         );
       })}
+      {ws?.messages.length && !msgs.length ? <Card className="p-6 text-center text-[13px] text-muted">Nothing here.</Card> : null}
     </div>
   );
 }

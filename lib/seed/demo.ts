@@ -27,9 +27,10 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
     const id = `co_${dc.key}`;
     const score = combineScore(dc.fit, dc.intent);
     const hq = dc.hunterHq ?? dc.apolloHq;
+    const hqSource: Source | null = dc.hunterHq ? "hunter" : dc.apolloHq ? "apollo" : null;
     const company: Company = {
-      id, name: dc.name, domain: dc.domain, domainSource: "mock", industry: dc.industry, naics: dc.naics,
-      headcount: dc.headcount, region: dc.region, hq, hqSource: hq ? "mock" : null,
+      id, name: dc.name, domain: dc.domain, domainSource: "tavily", industry: dc.industry, naics: dc.naics,
+      headcount: dc.headcount, region: dc.region, hq, hqSource,
       fitScore: dc.fit, intentScore: dc.intent, score, tier: tierFor(score),
       excluded: Boolean(dc.excludeReason), excludeReason: dc.excludeReason ?? null, signalsRefreshedAt: at(90),
     };
@@ -47,13 +48,15 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
 
     dc.people.forEach((p, i) => {
       const m = mockPersonContact(dc.domain, p.first, p.last);
-      const email = m.hunterEmail ?? m.apolloEmail;
+      const hunterOk = m.hunterEmail && p.hunterStatus !== "invalid";
+      const email = hunterOk ? m.hunterEmail : m.apolloEmail;
       const linkedin = m.hunterLinkedin ?? m.apolloLinkedin;
-      const src = (v: string | null): Source | null => (v ? "mock" : null);
+      const emailSource: Source | null = email ? (hunterOk ? "hunter" : "apollo") : null;
+      const linkedinSource: Source | null = linkedin ? (m.hunterLinkedin ? "hunter" : "apollo") : null;
       const person: Person = {
         id: `per_${dc.key}_${i}`, companyId: id, name: `${p.first} ${p.last}`, title: p.title, seniority: p.seniority,
-        email, emailStatus: m.hunterEmail ? p.hunterStatus : email ? "valid" : "unknown", emailSource: src(email), mx: Boolean(email),
-        linkedinUrl: linkedin, linkedinSource: src(linkedin), personaMatch: p.seniority === "c_level" || p.seniority === "vp" ? 0.9 : 0.8,
+        email, emailStatus: hunterOk ? p.hunterStatus : email ? "valid" : "unknown", emailSource, mx: Boolean(email),
+        linkedinUrl: linkedin, linkedinSource, personaMatch: p.seniority === "c_level" || p.seniority === "vp" ? 0.9 : 0.8,
       };
       ws.people.push(person);
     });
@@ -73,15 +76,15 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
   const nw = ws.leads.find((l) => l.companyId === "co_northwind")!;
   const draft = (id: string, channel: "email" | "linkedin", step: 1 | 2 | 3, dayOffset: number, subject: string | null, body: string): Message => ({
     id, leadId: nw.id, personId: nw.personId, channel, step, dayOffset, variant: nw.variant, valueProp: "Close in 3 days, not 10",
-    subject, body, signalIds: ["sig_northwind_0"], status: "pending_approval", review: { reviewer: "pass", security: "pass" },
+    subject, body, signalIds: step === 1 ? ["sig_northwind_0"] : [], status: "pending_approval", review: { reviewer: "pass", security: "pass" },
     editedByRep: false, sentAt: null, deliveredTo: null,
   });
   ws.messages.push(
     draft("msg_nw_e1", "email", 1, 0, "Northwind's finance data hiring",
       "Hi Priya,\n\nSaw Northwind is hiring three finance data engineers and a senior accountant for the close. Teams at that stage often find the close stretching past a week as entities grow.\n\nLedgerlight reconciles bank feeds and drafts journal entries inside NetSuite, and customers close in about 3 days.\n\nWorth a 20 minute look next week?\n\nMaya"),
-    draft("msg_nw_l1", "linkedin", 1, 1, null,
+    draft("msg_nw_l1", "linkedin", 2, 2, null,
       "Hi Priya, we both spent time around Stratus Data's finance systems. Noticed Northwind is scaling the close team after the Series C. Happy to share what we learned automating reconciliations there."),
-    draft("msg_nw_e2", "email", 2, 4, "Re: Northwind's finance data hiring",
+    draft("msg_nw_e2", "email", 3, 5, "Re: Northwind's finance data hiring",
       "Hi Priya, one more thought: with the UK expansion from the Series C, a second entity usually adds two or three days to each close. Ledgerlight handles multi-entity consolidation out of the box. Open to a short call?"),
   );
 

@@ -17,3 +17,15 @@ Intent (0–100) = per signal type, counted once: hiring 30, tech adoption 30, l
 4. Citation validator (`lib/pipeline/citations.ts`) normalises URLs and drops any company with no URL that search returned; signals with unreturned URLs are dropped too.
 5. Negative filter: any `negative` signal, an ICP negative signal found in the signal text, or an excluded region. Filtered companies stay in the grid with the reason and never become leads.
 6. Fit + Intent scoring, tier, save. A competitor map is built from a separate search, with the same citation rule.
+
+## Enrichment (P2)
+
+Per company, best score first, with a 2-credit check before each lead: Hunter Company (HQ) → Apollo Org if missing; Hunter Domain Search to pick the buyer (ICP persona match, then seniority); Hunter Email Finder + Verifier; Apollo People Match only for a missing or invalid email or a missing LinkedIn URL (Apollo emails are re-verified by Hunter). Each field stores the step that filled it (`hunter` or `apollo`). Invalid emails are never kept; a lead without an email gets no email touches.
+
+## Outreach loop (P2)
+
+1. @builder drafts 3 touches: email (day 0), LinkedIn note (day 2), email (day 5). Variant A angle = time saved, B = risk reduced (alternating per lead).
+2. @reviewer (`lib/agents/reviewer.ts`): touch 1 cites a real signal id; ≤80 words for C-level, ≤120 otherwise, ≤60 for LinkedIn; one question; no dashes or buzzwords. Fixes go back to @builder, max 2 rounds, then escalate (`needs_fix`).
+3. @security (`lib/agents/security.ts`): links only to cited domains; no email addresses or secrets in copy.
+4. @human approves, edits or rejects. Approving an email sends it through SendGrid to `DEMO_RECIPIENT` (simulated unless `SENDING_ENABLED=true`), charges 1 credit, and moves the lead Matched → Contacted tagged *agent*. Approving a LinkedIn note only queues it; the rep copies it, sends by hand and clicks "Mark sent", which moves the lead tagged *rep*.
+5. SendGrid Inbound Parse posts replies to `/api/webhooks/sendgrid?token=CRON_SECRET`; a reply moves the lead to Replied.

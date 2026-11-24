@@ -59,3 +59,10 @@ export function ConfidenceBar({ value }: { value: number }) {
     </div>
   );
 }
+
+const SOURCE_LABEL: Record<string, string> = { hunter: "Hunter", apollo: "Apollo", tavily: "Tavily", website: "Website", mock: "Mock" };
+export function SourceBadge({ source, title }: { source: string | null; title?: string }) {
+  if (!source) return null;
+  const tone = source === "hunter" ? "green" : source === "apollo" ? "violet" : "neutral";
+  return <Badge tone={tone} title={title ?? `Source: ${SOURCE_LABEL[source] ?? source}`}>{SOURCE_LABEL[source] ?? source}</Badge>;
+}
