@@ -7,7 +7,7 @@ import { useRun } from "@/components/run/RunProvider";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { RefreshButton } from "@/components/RefreshButton";
 import { EmptyState } from "@/components/EmptyState";
-import { Avatar, Badge, Button, Card, PageTitle, ScoreRing, SectionTitle, SourceBadge, Toast } from "@/components/ui";
+import { Avatar, Badge, Button, Card, PageTitle, ScoreRing, SectionTitle, Toast } from "@/components/ui";
 import { Tip } from "@/components/Tip";
 import { SignalChip } from "@/components/signals";
 import type { Person } from "@/lib/types";
@@ -76,6 +76,7 @@ export default function DiscoveryPage() {
   const header = <PageTitle icon={Search} title="Discovery" tip="Companies that fit the ICP. Every lead and signal links to the page search returned; leads without a source are dropped, and negative signals filter a company out."><RunDiscovery onDone={setLast} /></PageTitle>;
   if (!ws?.companies.length) return <div>{header}<EmptyState what="companies" /></div>;
   const rows = [...ws.companies].sort((a, b) => Number(a.excluded) - Number(b.excluded) || b.score - a.score);
+  const anyBuyer = rows.some((c) => ws.people.some((p) => p.companyId === c.id));
 
   return (
     <div>
@@ -91,9 +92,10 @@ export default function DiscoveryPage() {
       )}
 
       <Card className="overflow-x-auto">
+        {/* Columns with nothing in them yet (no buyers before enrichment) are left out. */}
         <table className="w-full text-[13px]">
           <thead className="text-left text-[10px] tracking-wider text-muted uppercase">
-            <tr className="border-b border-line">{["", "Company", "Signals", "Buyer", "Email", "In", "Sources"].map((h, i) => <th key={i} className="px-3 py-2 font-medium">{h}</th>)}</tr>
+            <tr className="border-b border-line">{["", "Company", "Signals", ...(anyBuyer ? ["Buyer"] : []), "Sources"].map((h, i) => <th key={i} className="px-3 py-2 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-line">
             {rows.map((c) => {
@@ -113,36 +115,26 @@ export default function DiscoveryPage() {
                       <span className="font-medium">{c.name}</span>
                     </Tip>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
-                      <span className="inline-flex items-center gap-0.5"><Users size={11} />{c.headcount.toLocaleString()}</span>
+                      {c.headcount > 0 && <span className="inline-flex items-center gap-0.5"><Users size={11} />{c.headcount.toLocaleString()}</span>}
                       {c.hq && <Tip content={`HQ: ${c.hq}${c.hqSource ? ` (source: ${c.hqSource})` : ""}`}><span className="inline-flex items-center gap-0.5"><MapPin size={11} />{c.hq.split(",")[0]}</span></Tip>}
                       {c.excluded && <span className="text-danger">{c.excludeReason?.replace(/^Negative signal:\s*/i, "")}</span>}
                     </div>
                   </td>
                   <td className="px-3 py-2"><div className="flex flex-wrap gap-1">{signals.map((s) => <SignalChip key={s.id} s={s} />)}</div></td>
-                  <td className="px-3 py-2">
-                    {buyer ? (
+                  {anyBuyer && <td className="px-3 py-2">
+                    {buyer && (
                       <div className="flex items-center gap-2">
                         <Avatar name={buyer.name} title={buyer.previouslyAt?.length ? `Previously at ${buyer.previouslyAt.join(", ")}` : undefined} />
-                        <div className="leading-tight"><div className="text-[12px] font-medium">{buyer.name}</div><div className="max-w-[140px] truncate text-[11px] text-muted">{buyer.title}</div></div>
+                        <div className="leading-tight">
+                          <div className="flex items-center gap-1.5 text-[12px] font-medium">{buyer.name}
+                            {e && <Tip content={`${e.label}${buyer.email ? `\n${buyer.email}` : ""} · ${buyer.emailSource}`}><e.icon size={13} className={e.cls} aria-label={e.label} /></Tip>}
+                            {buyer.linkedinUrl && <Tip content={buyer.linkedinUrl}><a href={buyer.linkedinUrl} target="_blank" rel="noreferrer" aria-label="LinkedIn profile" className="text-rep hover:opacity-70"><Linkedin size={13} /></a></Tip>}
+                          </div>
+                          <div className="max-w-[180px] truncate text-[11px] text-muted">{buyer.title}</div>
+                        </div>
                       </div>
-                    ) : <span className="text-muted">–</span>}
-                  </td>
-                  <td className="px-3 py-2">
-                    {buyer && e && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Tip content={`${e.label}${buyer.email ? `\n${buyer.email}` : ""}\nMX: ${buyer.mx ? "yes" : "no"}`}><e.icon size={16} className={e.cls} aria-label={e.label} /></Tip>
-                        <SourceBadge source={buyer.emailSource} />
-                      </span>
                     )}
-                  </td>
-                  <td className="px-3 py-2">
-                    {buyer?.linkedinUrl ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <Tip content={buyer.linkedinUrl}><a href={buyer.linkedinUrl} target="_blank" rel="noreferrer" aria-label="LinkedIn profile" className="text-rep hover:opacity-70"><Linkedin size={15} /></a></Tip>
-                        <SourceBadge source={buyer.linkedinSource} />
-                      </span>
-                    ) : <span className="text-muted">–</span>}
-                  </td>
+                  </td>}
                   <td className="px-3 py-2">
                     <div className="flex gap-1">
                       {urls.map((u, i) => <Tip key={u} content={u}><a href={u} target="_blank" rel="noreferrer" className="grid h-5 min-w-5 place-items-center rounded-[4px] bg-accent/10 px-1 font-mono text-[10px] text-accent hover:bg-accent hover:text-white">{i + 1}</a></Tip>)}

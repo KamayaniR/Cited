@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
+import { ChevronDown, Search } from "lucide-react";
+import type { Message } from "@/lib/types";
 import { Inbox, PenLine, Linkedin, ListChecks, Mail } from "lucide-react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Avatar, Badge, Button, Card, PageTitle, ScoreRing, Segmented, Toast } from "@/components/ui";
-import { Tip } from "@/components/Tip";
 import { MessageCard } from "@/components/MessageCard";
 import { api } from "@/components/api";
 import { useRun } from "@/components/run/RunProvider";
@@ -53,30 +54,41 @@ export default function OutreachPage() {
         ]} />
       </div>
       {!ws?.messages.length && <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><PenLine size={20} />No drafts yet</Card>}
-      {ws && Object.entries(byLead).map(([leadId, ms]) => {
-        const lead = ws.leads.find((l) => l.id === leadId)!;
-        const company = ws.companies.find((c) => c.id === lead.companyId)!;
-        const person = ws.people.find((p) => p.id === lead.personId)!;
-        const signals = ws.signals.filter((s) => s.companyId === company.id);
-        return (
-          <Card key={leadId} className="mb-4 p-3.5">
-            <div className="mb-3 flex flex-wrap items-center gap-2.5">
-              <ScoreRing tier={company.tier} score={company.score} fit={company.fitScore} intent={company.intentScore} size={30} />
-              <Avatar name={person.name} />
-              <div className="leading-tight"><div className="text-[13px] font-medium">{person.name}</div><div className="text-[11px] text-muted">{person.title} · {company.name}</div></div>
-              <span className="ml-auto flex gap-1">
-                <Tip content="A/B variant of the sequence"><Badge>Variant {lead.variant}</Badge></Tip>
-                <Badge tone={lead.stage === "matched" ? "neutral" : "green"}>{lead.stage.replace("_", " ")}</Badge>
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-              {ms!.sort((a, b) => a.step - b.step).map((m) => <MessageCard key={m.id} m={m} person={person} signals={signals} refresh={refresh} />)}
-            </div>
-            <EvidenceSearch companyId={company.id} companyName={company.name} />
-          </Card>
-        );
-      })}
+      {ws && Object.entries(byLead).map(([leadId, ms]) => <LeadCard key={leadId} leadId={leadId} ms={ms!} />)}
       {ws?.messages.length && !msgs.length ? <Card className="p-6 text-center text-[13px] text-muted">Nothing here</Card> : null}
     </div>
+  );
+}
+
+/** One lead: touch 1 up front; later touches and evidence search open on demand. */
+function LeadCard({ leadId, ms }: { leadId: string; ms: Message[] }) {
+  const { ws, refresh } = useWorkspace();
+  const [more, setMore] = useState(false);
+  const [ask, setAsk] = useState(false);
+  if (!ws) return null;
+  const lead = ws.leads.find((l) => l.id === leadId);
+  const company = lead && ws.companies.find((c) => c.id === lead.companyId);
+  const person = lead && ws.people.find((p) => p.id === lead.personId);
+  if (!lead || !company || !person) return null;
+  const signals = ws.signals.filter((s) => s.companyId === company.id);
+  const sorted = [...ms].sort((a, b) => a.step - b.step);
+  const [first, ...rest] = sorted;
+  return (
+    <Card className="mb-3 p-3.5">
+      <div className="mb-3 flex flex-wrap items-center gap-2.5">
+        <ScoreRing tier={company.tier} score={company.score} fit={company.fitScore} intent={company.intentScore} size={30} />
+        <Avatar name={person.name} />
+        <div className="leading-tight"><div className="text-[13px] font-medium">{person.name}</div><div className="text-[11px] text-muted">{person.title} · {company.name}</div></div>
+        {lead.stage !== "matched" && <Badge tone="green">{lead.stage.replace("_", " ")}</Badge>}
+        <span className="ml-auto flex items-center gap-3 text-[12px] text-muted">
+          <button onClick={() => setAsk((v) => !v)} className="inline-flex items-center gap-1 hover:text-ink"><Search size={13} />Ask the evidence</button>
+          {rest.length > 0 && <button onClick={() => setMore((v) => !v)} aria-expanded={more} className="inline-flex items-center gap-1 hover:text-ink">{more ? "Hide follow-ups" : `Show ${rest.length} follow-up${rest.length > 1 ? "s" : ""}`}<ChevronDown size={13} className={more ? "rotate-180" : ""} /></button>}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        {(more ? sorted : [first]).map((m) => <MessageCard key={m.id} m={m} person={person} signals={signals} refresh={refresh} />)}
+      </div>
+      {ask && <EvidenceSearch companyId={company.id} companyName={company.name} />}
+    </Card>
   );
 }

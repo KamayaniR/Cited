@@ -16,7 +16,7 @@ export const SEQUENCE = [
   { step: 3 as const, channel: "email" as const, dayOffset: 5 },
 ];
 export const VALUE_PROPS = { A: "Saves time: faster outcome with less manual work", B: "Reduces risk: fewer errors and a clean audit trail" } as const;
-export const MAX_FIX_ROUNDS = 2;
+export const MAX_FIX_ROUNDS = 1;
 
 const DraftSchema = z.object({
   messages: z.array(z.object({
@@ -117,13 +117,15 @@ export async function buildSequence(ws: Workspace, lead: Lead): Promise<Sequence
   tokens += res.tokens; costUsd += res.costUsd;
   let drafts = res.data.messages;
   const review = async (ds: Draft[]) => {
+    // Claim checks for all touches run at once; findings keep touch order.
+    const ccs = await Promise.all(ds.map((d) => claimCheck(`${d.subject ?? ""}\n${d.body}`, claimCtx)));
     const out: string[] = [];
-    for (const d of ds) {
+    ds.forEach((d, i) => {
       out.push(...reviewMessage({ id: `s${d.step}`, ...d }, { seniority: person.seniority, signalIds }));
-      const cc = await claimCheck(`${d.subject ?? ""}\n${d.body}`, claimCtx);
+      const cc = ccs[i];
       checks.set(d.step, cc); claimMs += cc.ms;
       out.push(...cc.unsupported.map((u) => `s${d.step}: unsupported claim "${u}"`));
-    }
+    });
     return out;
   };
   let fixes = await review(drafts);

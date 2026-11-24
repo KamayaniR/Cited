@@ -8,6 +8,7 @@ import { newId, nowIso } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+const DRAFT_CONCURRENCY = 4;
 
 const Body = z.object({ leadIds: z.array(z.string()).optional() }).default({});
 
@@ -22,8 +23,18 @@ export const POST = route(async (req: Request) => {
   const batch = `b_${newId("").slice(1, 7)}`;
   mutate((ws) => agentEvent(ws, { from: "planner", to: "builder", kind: "handoff", text: formatHandoff({ to: "builder", verb: "TASK", args: { leads: String(queue.length), batch }, rest: "draft" }) }));
 
-  const all = [];
-  for (const lead of queue) {
+  // Leads are drafted in parallel (a few at a time); each lead's results land as soon as it finishes.
+  const all: Awaited<ReturnType<typeof buildSequence>>["messages"] = [];
+  const todo = [...queue];
+  const failed: string[] = [];
+  await Promise.all(Array.from({ length: Math.min(DRAFT_CONCURRENCY, todo.length) }, async () => {
+    for (let lead = todo.shift(); lead; lead = todo.shift()) {
+      // One lead failing does not lose the others' drafts.
+      await draftLead(lead).catch((e) => { failed.push(lead!.id); mutate((ws) => agentEvent(ws, { from: "builder", to: "planner", kind: "result", text: `Drafting ${lead!.id} failed: ${(e as Error).message}` })); });
+    }
+  }));
+
+  async function draftLead(lead: (typeof queue)[number]) {
     const r = await buildSequence(getWorkspace(), lead);
     all.push(...r.messages);
     mutate((ws) => {
@@ -37,6 +48,7 @@ export const POST = route(async (req: Request) => {
     });
   }
 
+  if (failed.length === queue.length) throw new ApiError("VENDOR_ERROR", "Drafting failed for every lead. See the agent log.");
   const pending = all.filter((m) => m.status === "pending_approval");
   mutate((ws) => {
     agentEvent(ws, { from: "reviewer", to: "security", kind: "handoff", text: formatHandoff({ to: "security", verb: "READY", args: { batch, reviewer: "pass" }, rest: "" }) });

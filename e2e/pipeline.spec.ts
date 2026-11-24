@@ -143,6 +143,10 @@ test("the run canvas shows only while an agent runs, and the loop stops at your 
   expect(s.workspace.messages.length).toBeGreaterThan(0);
   expect(s.workspace.messages.filter((m) => m.status === "sent")).toHaveLength(0);
 
+  await canvas.getByRole("button", { name: "Minimise run view" }).click();
+  await expect(canvas.locator("[data-step]")).toHaveCount(0);
+  await canvas.getByRole("button", { name: "Expand run view" }).click();
+  await expect(canvas.locator('[data-step="approval"]')).toBeVisible();
   await canvas.getByRole("button", { name: "Close run view" }).click();
   await expect(canvas).toHaveCount(0);
   expect(errors).toEqual([]);

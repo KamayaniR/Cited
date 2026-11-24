@@ -159,9 +159,20 @@ export async function pollDecisions(apply: (cmd: BandCommand, from: string) => P
   const keys = [...new Set((["security", "planner", "builder", "reviewer"] as AgentRole[]).map(keyFor))];
   const replies: string[] = [];
   let handled = 0;
+  const errors: string[] = [];
   for (const key of keys) {
+    try { await pollKey(key); } catch (e) { errors.push((e as Error).message); }
+  }
+  status.lastPollAt = new Date().toISOString();
+  // Band trouble is reported, never thrown: the queue in Cited still works without it.
+  if (errors.length && !handled) replies.push(`Band could not be read right now (${errors[0].slice(0, 120)}). Decide here instead.`);
+  return { handled, replies };
+
+  async function pollKey(key: string) {
     for (let i = 0; i < 20; i++) {
-      const next = await call<BandMessage>(key, "GET", `/agent/chats/${room}/messages/next`);
+      let next: { status: number; data: BandMessage | null };
+      try { next = await call<BandMessage>(key, "GET", `/agent/chats/${room}/messages/next`); }
+      catch (e) { if (/→ 404/.test((e as Error).message)) break; throw e; }
       if (next.status === 204 || !next.data) break;
       const msg = next.data;
       const claim = await call(key, "POST", `/agent/chats/${room}/messages/${msg.id}/processing`);
@@ -183,8 +194,6 @@ export async function pollDecisions(apply: (cmd: BandCommand, from: string) => P
       }
     }
   }
-  status.lastPollAt = new Date().toISOString();
-  return { handled, replies };
 }
 
 /** Standard Webhooks signature (webhook-id.timestamp.body, HMAC-SHA256, base64), or a plain bearer secret. */

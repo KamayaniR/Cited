@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Check, Loader2, Hand, Ban, X, MessageSquareText, Target, Search, Users, Mail, ShieldCheck, ScanSearch, Send, KanbanSquare, RotateCcw, Filter } from "lucide-react";
+import { useState } from "react";
+import { Check, Loader2, Hand, Ban, X, MessageSquareText, Target, Search, Users, Mail, ShieldCheck, ScanSearch, Send, KanbanSquare, RotateCcw, Filter, Minus, Maximize2 } from "lucide-react";
 import { useWorkspace } from "../WorkspaceProvider";
 import { useRun, type StepKey, type RunState } from "./RunProvider";
 import type { Workspace } from "@/lib/types";
@@ -102,21 +103,39 @@ function edgePath(i: number) {
 export function RunCanvas() {
   const { ws } = useWorkspace();
   const { run, visible, dismiss } = useRun();
+  const [min, setMin] = useState(false);
   if (!visible || !ws || !run) return null;
   const { steps, rewrites, filtered } = deriveSteps(ws, run);
   const doneN = ORDER.filter((k) => steps[k].status === "done").length;
   const current = run.active ?? run.blocked?.step ?? null;
   const title = run.kind === "loop" ? "Running the loop" : run.kind === "refresh" ? "Refreshing signals" : `Running ${run.kind}`;
 
+  const stepText = current ? `Step ${ORDER.indexOf(current) + 1} of ${ORDER.length} · ${NODES[ORDER.indexOf(current)].label}` : "Done";
+  const dot = `h-2 w-2 shrink-0 rounded-full ${run.active ? "animate-pulse bg-accent" : run.blocked ? (run.blocked.needsYou ? "bg-tier-b" : "bg-danger") : "bg-tier-a"}`;
+
+  if (min) return (
+    <div role="region" aria-label="Agent run" className="run-in fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-full border border-line bg-white/95 py-1.5 pr-1.5 pl-3.5 shadow-xl backdrop-blur">
+      <button onClick={() => setMin(false)} aria-label="Expand run view" className="flex items-center gap-2.5 text-[12.5px]">
+        <span className={dot} />
+        <span className="font-semibold">{title}</span>
+        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-line"><span className="block h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${(doneN / ORDER.length) * 100}%` }} /></span>
+        <span className="text-muted">{stepText}</span>
+        <Maximize2 size={13} className="text-muted" />
+      </button>
+      <button onClick={dismiss} aria-label="Close run view" className="rounded-full p-1 text-muted hover:bg-line/60 hover:text-ink"><X size={14} /></button>
+    </div>
+  );
+
   return (
     <div role="region" aria-label="Agent run" className="run-in fixed inset-x-3 bottom-3 z-40 mx-auto max-w-[1060px] rounded-[14px] border border-line bg-white/95 shadow-2xl backdrop-blur">
       <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <span className={`h-2 w-2 rounded-full ${run.active ? "animate-pulse bg-accent" : run.blocked ? (run.blocked.needsYou ? "bg-tier-b" : "bg-danger") : "bg-tier-a"}`} />
+        <span className={dot} />
         <span className="text-[13px] font-semibold">{title}</span>
         <div className="h-1.5 max-w-[260px] flex-1 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${(doneN / ORDER.length) * 100}%` }} /></div>
-        <span className="text-[12px] text-muted">{current ? `Step ${ORDER.indexOf(current) + 1} of ${ORDER.length} · ${NODES[ORDER.indexOf(current)].label}` : "Done"}</span>
+        <span className="text-[12px] text-muted">{stepText}</span>
         {run.blocked && <span className={`truncate text-[12px] ${run.blocked.needsYou ? "text-tier-b" : "text-danger"}`}>{run.blocked.message}</span>}
-        <button onClick={dismiss} aria-label="Close run view" className="ml-auto rounded-[6px] p-1 text-muted hover:bg-line/60 hover:text-ink"><X size={15} /></button>
+        <button onClick={() => setMin(true)} aria-label="Minimise run view" className="ml-auto rounded-[6px] p-1 text-muted hover:bg-line/60 hover:text-ink"><Minus size={15} /></button>
+        <button onClick={dismiss} aria-label="Close run view" className=" rounded-[6px] p-1 text-muted hover:bg-line/60 hover:text-ink"><X size={15} /></button>
       </div>
       <div className="relative h-[250px] w-full bg-[radial-gradient(rgba(0,0,0,0.07)_1px,transparent_1px)] [background-size:16px_16px]">
         <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${W} 250`} preserveAspectRatio="none" aria-hidden>

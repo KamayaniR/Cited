@@ -4,7 +4,7 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Badge, Button, Card } from "@/components/ui";
 import { Tip, InfoTip } from "@/components/Tip";
 import { RoleChip } from "@/components/AgentPanel";
-import { Mail, Linkedin, Users, Link2, ShieldCheck, ShieldAlert, Coins, Check, X, Radio, Database } from "lucide-react";
+import { Mail, Linkedin, ShieldCheck, ShieldAlert, Check, X, Radio, Database } from "lucide-react";
 import { api } from "@/components/api";
 import type { Approval, Workspace } from "@/lib/types";
 
@@ -57,6 +57,7 @@ function BatchCard({ a, ws }: { a: Approval; ws: Workspace }) {
   const emails = open.filter((m) => m.channel === "email").length;
   const supported = msgs.filter((m) => m.review?.grounding ? m.review.grounding.claims.every((c) => c.supported) : true).length;
   const [rejects, setRejects] = useState<Record<string, string>>({});
+  const [pick, setPick] = useState(false);
 
   async function decide(decision: "approve" | "reject") {
     setBusy(true); setResult(null);
@@ -73,17 +74,11 @@ function BatchCard({ a, ws }: { a: Approval; ws: Workspace }) {
     <Card className="border-l-4 border-l-accent p-3.5">
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <RoleChip role="security" />
-        <span className="font-semibold">Batch {String(a.payload.batch)}</span>
-        <span className="flex flex-wrap items-center gap-1">
-          <Badge icon={Users} title="Leads in this batch">{leads}</Badge>
-          <Badge icon={Mail} title="Messages">{msgs.length}</Badge>
-          <Badge icon={Link2} tone="accent" title="Cited signals behind these messages">{signals}</Badge>
-          <Badge icon={ShieldCheck} tone="green" title="Links to uncited domains: 0">links ok</Badge>
-          <Badge icon={allOk ? ShieldCheck : ShieldAlert} tone={allOk ? "green" : "red"} title="Messages whose every claim matched stored evidence">{supported}/{msgs.length} claims</Badge>
-          <Badge icon={Coins} tone="amber" title="1 credit per email sent; LinkedIn is sent by hand">{emails}</Badge>
-        </span>
+        <span className="font-semibold">{open.length} {open.length === 1 ? "message" : "messages"} for {leads} {leads === 1 ? "lead" : "leads"} {open.length === 1 ? "is" : "are"} ready</span>
+        <Badge icon={allOk ? ShieldCheck : ShieldAlert} tone={allOk ? "green" : "red"} title={`Every claim checked against stored evidence · ${signals} cited signals · links ok · ${emails} credits to send the emails`}>{allOk ? "all claims cited" : `${supported}/${msgs.length} claims cited`}</Badge>
+        <button onClick={() => setPick((v) => !v)} className="ml-auto text-[12px] text-muted hover:text-ink">{pick ? "Hide list" : "Pick some to reject"}</button>
       </div>
-      <div className="mt-2.5 space-y-1">
+      {pick && <div className="mt-2.5 space-y-1">
         {open.map((m) => {
           const on = m.id in rejects;
           return (
@@ -99,7 +94,7 @@ function BatchCard({ a, ws }: { a: Approval; ws: Workspace }) {
             </div>
           );
         })}
-      </div>
+      </div>}
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <Button icon={Check} onClick={() => decide("approve")} disabled={busy || !open.length}>{busy ? "Working…" : nRej ? `Approve ${open.length - nRej}, reject ${nRej}` : `Approve all ${open.length}`}</Button>
         <Button variant="secondary" icon={X} onClick={() => decide("reject")} disabled={busy || !open.length}>Reject batch</Button>
