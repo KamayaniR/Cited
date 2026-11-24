@@ -18,23 +18,28 @@ export function buildQueries(icp: Icp, expansions: Expansion[] = []): string[] {
   const industries = [...icp.industries].sort((a, b) => b.confidence - a.confidence);
   const qs: string[] = [];
   for (const ind of industries) {
-    for (const t of triggers.slice(0, 2)) qs.push(`${ind.name} companies ${t.signal} ${region}`.trim());
+    for (const t of triggers.slice(0, 2)) qs.push(`${ind.name} company ${t.signal} ${region} news`.trim());
   }
   for (const e of expansions.filter((x) => x.status === "accepted" || x.status === "adjusted")) qs.unshift(`${e.segment} ${triggers[0]?.signal ?? ""}`.trim());
   return [...new Set(qs)].slice(0, MAX_QUERIES);
 }
 
 // ---------- 2. Extraction ----------
+// Lenient on optional facts (live LLMs leave gaps); strict on what we cite.
 export const ProspectSchema = z.object({
   companies: z.array(z.object({
     name: z.string(),
-    domain: z.string(),
-    industry: z.string(),
-    naics: z.string(),
-    headcount: z.number(),
-    region: z.string(),
+    domain: z.string().nullish().transform((v) => v ?? ""),
+    industry: z.string().nullish().transform((v) => v ?? ""),
+    naics: z.coerce.string().nullish().transform((v) => v ?? ""),
+    headcount: z.coerce.number().nullish().transform((v) => v ?? 0),
+    region: z.string().nullish().transform((v) => v ?? ""),
     sourceUrls: z.array(z.string()).min(1),
-    signals: z.array(z.object({ type: SignalTypeEnum, summary: z.string(), sourceUrl: z.string() })),
+    signals: z.array(z.object({
+      type: z.string().transform((t) => (SignalTypeEnum.options as string[]).includes(t) ? (t as z.infer<typeof SignalTypeEnum>) : "launch"),
+      summary: z.string().nullish(),
+      sourceUrl: z.string().nullish(),
+    })).default([]).transform((xs) => xs.filter((x): x is { type: z.infer<typeof SignalTypeEnum>; summary: string; sourceUrl: string } => Boolean(x.summary && x.sourceUrl))),
   })),
 });
 type Prospect = z.infer<typeof ProspectSchema>["companies"][number];
@@ -76,15 +81,15 @@ export function negativeReason(p: { region: string; signals: { type: string; sum
 const CompetitorSchema = z.object({
   competitors: z.array(z.object({
     name: z.string(), domain: z.string(), category: z.enum(["direct", "adjacent", "status_quo"]),
-    positioning: z.string(), pricing: z.string(), ourAdvantage: z.string(), sourceUrl: z.string(),
-  })).max(6),
+    positioning: z.string(), pricing: z.string().nullish().transform((v) => v ?? "Not published"), ourAdvantage: z.string(), sourceUrl: z.string(),
+  })).transform((xs) => xs.slice(0, 6)),
 });
 
 async function mapCompetitors(product: ProductInput) {
   const { results } = await search(`${product.name} ${product.description.split(".")[0]} alternatives competitors pricing`, { maxResults: 8 });
   const res = await completeJson({
     task: "competitors",
-    system: "You map a product's competitors from search results. Use only companies that appear in the results; sourceUrl must be one of the result URLs. Include the status quo (doing nothing / spreadsheets) as category status_quo if relevant.",
+    system: "You map a product's competitors from search results. Use only companies that appear in the results; sourceUrl must be one of the result URLs. Include the status quo (doing nothing / spreadsheets) as category status_quo if relevant. At most 6.",
     prompt: `Product:\n${JSON.stringify(product)}\n\nSearch results:\n${JSON.stringify(results.map((r) => ({ url: r.url, title: r.title, content: r.content.slice(0, 500) })))}\n\nReturn {"competitors":[{"name","domain","category","positioning","pricing","ourAdvantage","sourceUrl"}]}`,
     schema: CompetitorSchema,
     mock: () => ({ competitors: DEMO_COMPETITORS.map((c) => ({ ...c, sourceUrl: `https://${c.domain}/` })) }),
@@ -111,8 +116,18 @@ export interface DiscoveryOutput {
   mode: "live" | "mock";
 }
 
+const QueriesSchema = z.object({ queries: z.array(z.string()).min(1).transform((q) => q.slice(0, MAX_QUERIES)) });
+
 export async function runDiscovery(input: { icp: Icp; expansions: Expansion[]; product: ProductInput; existingDomains?: string[] }): Promise<DiscoveryOutput> {
-  const queries = buildQueries(input.icp, input.expansions);
+  const fallback = buildQueries(input.icp, input.expansions);
+  const qres = await completeJson({
+    task: "discovery_queries",
+    system: `Write up to ${MAX_QUERIES} short web search queries (4-9 words each) that find NAMED companies matching this ICP and showing its buying triggers, e.g. news of hires, funding, ERP go-lives. Prefer queries that return company announcements, press releases and job posts. Accepted expansion segments go first.`,
+    prompt: `ICP: ${JSON.stringify(input.icp)}\nAccepted expansions: ${JSON.stringify(input.expansions.filter((e) => e.status !== "dismissed" && e.status !== "proposed").map((e) => e.segment))}\nReturn {"queries":["..."]}`,
+    schema: QueriesSchema,
+    mock: () => ({ queries: fallback }),
+  });
+  const queries = qres.data.queries;
 
   // Search, dedupe by URL.
   const seen = new Map<string, SearchResult>();
@@ -126,10 +141,11 @@ export async function runDiscovery(input: { icp: Icp; expansions: Expansion[]; p
   const ext = await completeJson({
     task: "extract_prospects",
     system: `Extract B2B companies that match the ICP from web search results.
-Rules: only companies named in the results; sourceUrls and each signal's sourceUrl must be copied exactly from result URLs; never invent a URL or a domain.
+Rules: only companies named in the results (not publishers, vendors or consultancies writing the article); sourceUrls and each signal's sourceUrl must be copied exactly from result URLs; never invent a URL.
+domain: the company's official website domain as you know it (it is verified by search before use).
 Signal type is one of ${SignalTypeEnum.options.join(", ")}; use "negative" for hiring freezes, layoffs, bankruptcy or similar.
 Estimate headcount from the text; give a 6-digit NAICS code.`,
-    prompt: `ICP:\n${JSON.stringify(input.icp)}\n\nSearch results:\n${JSON.stringify(results.map((r) => ({ url: r.url, title: r.title, content: r.content.slice(0, 600) })))}\n\nReturn {"companies":[...]}`,
+    prompt: `ICP:\n${JSON.stringify(input.icp)}\n\nSearch results:\n${JSON.stringify(results.map((r) => ({ url: r.url, title: r.title, content: r.content.slice(0, 600) })))}\n\nReturn exactly this shape, every field filled (use "" or 0 when unknown, but never invent):\n{"companies":[{"name":"","domain":"example.com","industry":"","naics":"000000","headcount":0,"region":"United States","sourceUrls":["<result url>"],"signals":[{"type":"hiring","summary":"","sourceUrl":"<result url>"}]}]}`,
     schema: ProspectSchema,
     mock: () => mockExtract(results),
     maxTokens: 8000,
@@ -145,9 +161,23 @@ Estimate headcount from the text; give a 6-digit NAICS code.`,
   const skip = new Set(input.existingDomains ?? []);
 
   for (const p of kept) {
-    const domain = p.domain.toLowerCase().replace(/^www\./, "");
-    if (skip.has(domain)) continue;
-    skip.add(domain);
+    // Domain must come from a cited URL when the model left it blank; never guessed from the name.
+    const clean = (d: string) => d.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+    const claimed = clean(p.domain);
+    let finalDomain = p.sourceUrls.map(hostOf).find((h) => claimed && h === claimed) ?? "";
+    let domainFromLookup = false;
+    if (!finalDomain) {
+      // Verify the claimed domain with search: accepted only when search returns a page served from it.
+      let hit = "";
+      if (claimed) {
+        const { results: site } = await search(p.name, { maxResults: 3, includeDomains: [claimed] });
+        if (site.some((r) => hostOf(r.url) === claimed || hostOf(r.url).endsWith(`.${claimed}`))) hit = claimed;
+      }
+      if (hit) { finalDomain = hit; domainFromLookup = true; }
+    }
+    if (!finalDomain) { dropped.push({ item: p, reason: "No company domain found in cited sources or by search" }); continue; }
+    if (skip.has(finalDomain)) continue;
+    skip.add(finalDomain);
     const id = newId("co");
     const coSignals: Signal[] = p.signals
       .map((s) => ({ s, src: isReturned(s.sourceUrl, returnedUrls) }))
@@ -159,10 +189,10 @@ Estimate headcount from the text; give a 6-digit NAICS code.`,
     const intent = intentScore(input.icp, coSignals);
     const score = combineScore(fit, intent);
     // Domain is trusted only when it appears in one of the cited URLs.
-    const domainCited = p.sourceUrls.some((u) => hostOf(u) === domain);
+    const domainCited = domainFromLookup || p.sourceUrls.some((u) => hostOf(u) === finalDomain);
 
     companies.push({
-      id, name: p.name, domain, domainSource: domainCited ? "tavily" : "mock", industry: p.industry, naics: p.naics,
+      id, name: p.name, domain: finalDomain, domainSource: domainCited ? "tavily" : "mock", industry: p.industry, naics: p.naics,
       headcount: p.headcount, region: p.region, hq: null, hqSource: null,
       fitScore: fit, intentScore: intent, score, tier: tierFor(score),
       excluded: Boolean(reason), excludeReason: reason, signalsRefreshedAt: now,

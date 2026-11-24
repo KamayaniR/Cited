@@ -22,6 +22,8 @@ export function pickBuyer(icp: Icp, contacts: hunter.HunterContact[]) {
   for (const c of contacts) {
     const t = c.position.toLowerCase();
     const persona = icp.personas.find((p) => t.includes(p.title.toLowerCase()) || p.title.toLowerCase().split(/\s+/).every((w) => t.includes(w)));
+    const relevant = Boolean(persona) || /financ|controller|cfo|accounting|treasur/.test(t);
+    if (!relevant) continue; // seniority alone never makes someone the buyer
     const score = (persona ? 1 + persona.confidence : 0) + (SENIORITY_RANK[c.seniority] ?? 0) / 2 + (/financ|controller|cfo|accounting/.test(t) ? 0.5 : 0);
     if (!best || score > best.score) best = { c, score };
   }

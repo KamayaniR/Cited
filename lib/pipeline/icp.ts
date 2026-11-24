@@ -11,7 +11,7 @@ const ExpansionDraftSchema = z.object({
   rationale: z.string(),
   searchQuery: z.string().describe("A web search query that would find evidence for this segment"),
 });
-const IcpResultSchema = z.object({ icp: IcpSchema, expansions: z.array(ExpansionDraftSchema).max(3) });
+const IcpResultSchema = z.object({ icp: IcpSchema, expansions: z.array(ExpansionDraftSchema).transform((xs) => xs.slice(0, 3)) });
 
 const SYSTEM = `You are a B2B go-to-market strategist. From a product description, infer the ideal customer profile.
 Rules:

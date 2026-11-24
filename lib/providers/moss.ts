@@ -23,7 +23,10 @@ export const SUPPORT_THRESHOLD = 0.45;
 
 // ---------------- live ----------------
 type MossClientT = import("@moss-js/moss").MossClient;
-const g = globalThis as unknown as { __moss?: MossClientT; __mossLoaded?: boolean; __mossMock?: Map<string, EvidenceDoc> };
+const g = globalThis as unknown as { __moss?: MossClientT; __mossLoaded?: boolean; __mossMock?: Map<string, EvidenceDoc>; __mossLoadFailed?: string };
+
+/** True when Moss cloud is live but the index could not be loaded in-process (e.g. a sandbox blocks the download). */
+export function mossDegraded(): string | null { return g.__mossLoadFailed ?? null; }
 
 async function client(): Promise<MossClientT> {
   if (g.__moss) return g.__moss;
@@ -43,11 +46,9 @@ async function ensureLoaded(force = false) {
 export async function indexEvidence(docs: EvidenceDoc[]): Promise<{ count: number; mode: "live" | "mock"; ms: number }> {
   const t0 = performance.now();
   if (!docs.length) return { count: 0, mode: isLive("moss") ? "live" : "mock", ms: 0 };
-  if (!isLive("moss")) {
-    const store = (g.__mossMock ??= new Map());
-    for (const d of docs) store.set(d.id, d);
-    return { count: docs.length, mode: "mock", ms: performance.now() - t0 };
-  }
+  const store = (g.__mossMock ??= new Map());
+  for (const d of docs) store.set(d.id, d);
+  if (!isLive("moss")) return { count: docs.length, mode: "mock", ms: performance.now() - t0 };
   try {
     const c = await client();
     const payload = docs.map((d) => ({ id: d.id, text: d.text.slice(0, 4000), metadata: { ...d.metadata } }));
@@ -55,7 +56,8 @@ export async function indexEvidence(docs: EvidenceDoc[]): Promise<{ count: numbe
     try { await c.getIndex(env.mossIndex); } catch { exists = false; }
     if (exists) await c.addDocs(env.mossIndex, payload, { upsert: true });
     else await c.createIndex(env.mossIndex, payload);
-    await ensureLoaded(true);
+    try { await ensureLoaded(true); g.__mossLoadFailed = undefined; }
+    catch (e) { g.__mossLoadFailed = (e as Error).message; console.warn("[moss] in-process load failed, using local engine:", g.__mossLoadFailed); }
     return { count: docs.length, mode: "live", ms: performance.now() - t0 };
   } catch (e) {
     throw new ApiError("VENDOR_ERROR", `Moss indexing failed: ${(e as Error).message}`, { vendor: "moss" });
@@ -66,7 +68,7 @@ export async function indexEvidence(docs: EvidenceDoc[]): Promise<{ count: numbe
 export async function searchEvidence(query: string, opts: { companyId?: string; includeSelf?: boolean; topK?: number; alpha?: number; entityType?: string } = {}): Promise<EvidenceSearch> {
   const topK = opts.topK ?? 5;
   const scopes = opts.companyId ? [opts.companyId, ...(opts.includeSelf ? ["self"] : [])] : [undefined];
-  if (!isLive("moss")) {
+  if (!isLive("moss") || g.__mossLoadFailed) {
     const t0 = performance.now();
     const hits = scopes.flatMap((s) => mockQuery(query, { companyId: s, entityType: opts.entityType, topK }));
     return { hits: dedupeTop(hits, topK), ms: performance.now() - t0, mode: "mock", engine: "moss-mock" };

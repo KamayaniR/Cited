@@ -32,7 +32,7 @@ export function evidenceDocs(ws: Workspace): EvidenceDoc[] {
   if (ws.product) {
     const p = ws.product;
     docs.push({
-      id: `ev_${p.id}`, text: `${p.name}: ${p.description} Customers: ${p.customers}. Pricing: ${p.pricing}. ${p.constraints}`,
+      id: `ev_${p.id}`, text: `${p.name}: ${p.description} Customers: ${p.customers}. Pricing: ${p.pricing}. ${p.constraints} Team: ${p.teamBackground}`,
       metadata: { companyId: "self", entityType: "product", url: "", title: `${p.name} product description`, entityId: p.id },
     });
   }
