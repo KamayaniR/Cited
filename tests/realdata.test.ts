@@ -11,7 +11,7 @@ describe("real-data mode", () => {
     delete process.env.VITEST;
     expect(isLive("tavily")).toBe(false);
     expect(() => mockFor("tavily")).toThrow(MissingKeyError);
-    expect(() => mockFor("llm")).toThrow(/ANTHROPIC_API_KEY/);
+    expect(() => mockFor("llm")).toThrow(/LLAMA_API_KEY/);
   });
 
   it("keeps local fallbacks for infrastructure vendors", () => {

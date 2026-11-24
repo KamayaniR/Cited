@@ -6,7 +6,7 @@ import { useWorkspace } from "./WorkspaceProvider";
 import { Dot } from "./ui";
 import { Tip } from "./Tip";
 
-const VENDOR_LABEL: Record<string, string> = { llm: "Claude", tavily: "Tavily", hunter: "Hunter", apollo: "Apollo", sendgrid: "SendGrid", flexprice: "Flexprice", band: "Band", neo4j: "Neo4j", supabase: "Supabase", moss: "Moss" };
+const VENDOR_LABEL: Record<string, string> = { llm: "Llama", tavily: "Tavily", hunter: "Hunter", apollo: "Apollo", sendgrid: "SendGrid", flexprice: "Flexprice", band: "Band", neo4j: "Neo4j", supabase: "Supabase", moss: "Moss" };
 
 export function TopBar() {
   const { ws, modes } = useWorkspace();

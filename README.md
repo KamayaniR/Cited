@@ -69,7 +69,8 @@ BASE=http://localhost:3200 npm run record-demo   # writes public/demo/cited-demo
 
 | Variable | Vendor | Where to get it |
 |---|---|---|
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | LLM (Claude) | console.anthropic.com |
+| `LLAMA_API_KEY`, `LLAMA_MODEL`, `LLAMA_BASE_URL` | LLM (Meta Llama, default for every agent) | llama.developer.meta.com |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | LLM fallback (Claude, used only if Llama and Moss fail or have no key) | console.anthropic.com |
 | `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX` | Evidence memory | portal.usemoss.dev |
 | `TAVILY_API_KEY` | Search | tavily.com |
 | `HUNTER_API_KEY` | Enrichment (primary) | hunter.io → API |

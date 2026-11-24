@@ -3,6 +3,9 @@ import "server-only";
 
 export const env = {
   llmProvider: process.env.LLM_PROVIDER ?? "anthropic",
+  llamaKey: process.env.LLAMA_API_KEY,
+  llamaModel: process.env.LLAMA_MODEL ?? "Llama-4-Maverick-17B-128E-Instruct-FP8",
+  llamaBaseUrl: process.env.LLAMA_BASE_URL ?? "https://api.llama.com/compat/v1",
   anthropicKey: process.env.ANTHROPIC_API_KEY,
   anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5",
   tavilyKey: process.env.TAVILY_API_KEY,
@@ -37,7 +40,7 @@ export const env = {
 /** Vendors that produce data the user sees. In live mode a missing key is an error, never made-up results. */
 export const DATA_VENDORS: Vendor[] = ["llm", "tavily", "hunter", "apollo"];
 
-const KEY_NAMES: Partial<Record<Vendor, string>> = { llm: "ANTHROPIC_API_KEY", tavily: "TAVILY_API_KEY", hunter: "HUNTER_API_KEY", apollo: "APOLLO_API_KEY" };
+const KEY_NAMES: Partial<Record<Vendor, string>> = { llm: "LLAMA_API_KEY", tavily: "TAVILY_API_KEY", hunter: "HUNTER_API_KEY", apollo: "APOLLO_API_KEY" };
 
 export class MissingKeyError extends Error {
   constructor(public vendor: Vendor) { super(`${KEY_NAMES[vendor] ?? vendor} is not set. Add it to .env.local to run this step on real data.`); }
@@ -65,7 +68,7 @@ export type Vendor =
 export function isLive(v: Vendor): boolean {
   if (env.forceMock) return false;
   switch (v) {
-    case "llm": return Boolean(env.anthropicKey) || Boolean(env.mossProjectId && env.mossProjectKey);
+    case "llm": return Boolean(env.llamaKey) || Boolean(env.anthropicKey) || Boolean(env.mossProjectId && env.mossProjectKey);
     case "tavily": return Boolean(env.tavilyKey);
     case "hunter": return Boolean(env.hunterKey);
     case "apollo": return Boolean(env.apolloKey);
