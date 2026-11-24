@@ -14,8 +14,8 @@ export default function IntakePage() {
       <PageTitle icon={MessageSquareText} title={ws?.product ? ws.product.name : "Describe the product"} tip="Describe what you sell. Cited infers the ICP (NAICS codes, size, regions, personas, buying triggers), each with a confidence score, and you approve it before discovery.">
         {ws?.icp?.approvedAt && <Link href="/discovery" className="inline-flex items-center gap-1 rounded-[6px] bg-accent/10 px-3 py-1.5 text-[13px] font-medium text-accent hover:bg-accent/15">Discovery<ArrowRight size={14} /></Link>}
       </PageTitle>
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.2fr]">
-        <div>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="min-w-0">
           <IntakeForm onDone={refresh} />
           {ws?.product && (
             <Tip className="mt-3 block" content={ws.product.description}>
@@ -26,7 +26,7 @@ export default function IntakePage() {
             </Tip>
           )}
         </div>
-        <div>{ws?.icp ? <IcpPanel ws={ws} refresh={refresh} /> : <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Target size={20} />Your ICP appears here</Card>}</div>
+        <div className="min-w-0">{ws?.icp ? <IcpPanel ws={ws} refresh={refresh} /> : <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Target size={20} />Your ICP appears here</Card>}</div>
       </div>
     </div>
   );

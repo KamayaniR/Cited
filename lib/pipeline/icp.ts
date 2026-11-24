@@ -40,11 +40,31 @@ export async function inferIcp(product: ProductInput) {
   // Ground each expansion: keep only evidence URLs that search actually returned.
   const expansions: Expansion[] = [];
   for (const e of res.data.expansions) {
-    const { results } = await search(e.searchQuery, { maxResults: 3 });
+    const { results } = await search(e.searchQuery, { maxResults: 6 });
     expansions.push({
       id: newId("exp"), segment: e.segment, rationale: e.rationale, status: "proposed",
-      evidence: results.slice(0, 2).map((r) => ({ url: r.url, title: r.title })),
+      evidence: pickEvidence(results).map((r) => ({ url: r.url, title: r.title })),
     });
   }
   return { icp: res.data.icp as Icp, expansions, tokens: res.tokens, costUsd: res.costUsd, mode: res.mode };
+}
+
+/**
+ * Evidence worth showing: a specific page (not a site's home page or a search listing), one per site,
+ * best two. A bare "linkedin.com" or two links to the same job board prove nothing.
+ */
+export function pickEvidence<T extends { url: string; title: string }>(results: T[], n = 2): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of results) {
+    let u: URL;
+    try { u = new URL(r.url); } catch { continue; }
+    const host = u.hostname.replace(/^www\./, "");
+    const specific = u.pathname.replace(/\/+$/, "").length > 1 && !/^\/(search|jobs?)\/?$/i.test(u.pathname);
+    if (!specific || seen.has(host)) continue;
+    seen.add(host);
+    out.push(r);
+    if (out.length === n) break;
+  }
+  return out;
 }

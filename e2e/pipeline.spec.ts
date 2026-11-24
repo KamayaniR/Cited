@@ -35,6 +35,7 @@ test("intake to sent email to Kanban, with citations and a human approval", asyn
   // Intake (form mode) and ICP
   await page.goto("/intake");
   await page.getByRole("button", { name: "Form", exact: true }).click();
+  await page.getByRole("button", { name: "Advanced (optional)" }).click();
   await page.getByLabel("Product name").fill("Ledgerlight");
   await page.getByLabel("What it does").fill("Ledgerlight automates the month-end close for mid-market finance teams: it reconciles bank feeds and drafts journal entries inside NetSuite and Sage Intacct.");
   await page.getByLabel("Customers").fill("Controllers and CFOs");

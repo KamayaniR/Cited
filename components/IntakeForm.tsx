@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button, Card, Segmented } from "./ui";
-import { MessageCircle, FileText, Sparkles, Bot, Check, Loader2, SendHorizontal, Target } from "lucide-react";
+import { MessageCircle, FileText, Sparkles, Bot, Check, Loader2, SendHorizontal, Target, ChevronRight } from "lucide-react";
 import { api } from "./api";
 import { useWorkspace } from "./WorkspaceProvider";
 import { DEMO_PRODUCT } from "@/lib/seed/fixtures";
@@ -9,20 +9,18 @@ import { DEMO_PRODUCT } from "@/lib/seed/fixtures";
 type Form = { name: string; description: string; customers: string; pricing: string; constraints: string; teamBackground: string; regions: string; excludeRegions: string };
 const EMPTY: Form = { name: "", description: "", customers: "", pricing: "", constraints: "", teamBackground: "", regions: "", excludeRegions: "" };
 
+// Describe it, done: the chat asks two things and the agent infers the rest.
 const QUESTIONS: { key: keyof Form; q: string }[] = [
   { key: "name", q: "What's the product called?" },
-  { key: "description", q: "What does it do, and for whom? A few sentences is plenty." },
-  { key: "customers", q: "Who buys it today, or who do you want to buy it?" },
-  { key: "pricing", q: "Roughly how is it priced?" },
-  { key: "regions", q: "Which regions do you sell in? (comma separated)" },
-  { key: "excludeRegions", q: "Any regions to avoid? (comma separated, or 'none')" },
-  { key: "teamBackground", q: "Where has your team worked or studied? This helps find warm paths." },
-  { key: "constraints", q: "Any constraints, like compliance or deal size? (or 'none')" },
+  { key: "description", q: "What does it do, and for whom? A few sentences is plenty: Cited works out who buys it." },
 ];
 
-const FIELDS: { key: keyof Form; label: string; area?: boolean }[] = [
+const CORE: { key: keyof Form; label: string; area?: boolean }[] = [
   { key: "name", label: "Product name" },
   { key: "description", label: "What it does", area: true },
+];
+/** Optional hints. Leave them empty and the agent infers customers, regions and triggers from the description. */
+const ADVANCED: { key: keyof Form; label: string; area?: boolean }[] = [
   { key: "customers", label: "Customers" },
   { key: "pricing", label: "Pricing" },
   { key: "regions", label: "Regions (comma separated)" },
@@ -41,6 +39,7 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<unknown> }) {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [advanced, setAdvanced] = useState(false);
 
   const split = (s: string) => s.split(",").map((x) => x.trim()).filter((x) => x && x.toLowerCase() !== "none");
 
@@ -65,7 +64,7 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<unknown> }) {
 
   function useExample() {
     setForm({ ...DEMO_PRODUCT, regions: DEMO_PRODUCT.regions.join(", "), excludeRegions: DEMO_PRODUCT.excludeRegions.join(", ") });
-    setMode("form");
+    setMode("form"); setAdvanced(true);
   }
 
   return (
@@ -96,17 +95,25 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<unknown> }) {
         </div>
       ) : (
         <form className="space-y-2.5" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-          {FIELDS.map((f) => (
-            <label key={f.key} className="block text-[12px] text-muted">{f.label}
-              {f.area
-                ? <textarea className={`${inputCls} mt-1 min-h-[72px] text-ink`} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
-                : <input className={`${inputCls} mt-1 text-ink`} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />}
-            </label>
-          ))}
+          {CORE.map((f) => <Field key={f.key} f={f} value={form[f.key]} onChange={(v) => setForm({ ...form, [f.key]: v })} />)}
+          <button type="button" onClick={() => setAdvanced(!advanced)} aria-expanded={advanced} className="flex items-center gap-1 text-[12px] font-medium text-muted hover:text-ink">
+            <ChevronRight size={14} className={`transition-transform ${advanced ? "rotate-90" : ""}`} />Advanced (optional)
+          </button>
+          {advanced && <div className="space-y-2.5 border-l-2 border-line pl-3">{ADVANCED.map((f) => <Field key={f.key} f={f} value={form[f.key]} onChange={(v) => setForm({ ...form, [f.key]: v })} />)}</div>}
           <Button type="submit" icon={busy ? Loader2 : Target} disabled={busy || !form.name || form.description.length < 10}>{busy ? "Inferring ICP…" : "Infer ICP"}</Button>
         </form>
       )}
       {error && <div className="mt-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[12px] text-danger">{error}</div>}
     </Card>
+  );
+}
+
+function Field({ f, value, onChange }: { f: { label: string; area?: boolean }; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block text-[12px] text-muted">{f.label}
+      {f.area
+        ? <textarea className={`${inputCls} mt-1 min-h-[72px] text-ink`} value={value} onChange={(e) => onChange(e.target.value)} />
+        : <input className={`${inputCls} mt-1 text-ink`} value={value} onChange={(e) => onChange(e.target.value)} />}
+    </label>
   );
 }

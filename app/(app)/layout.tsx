@@ -8,7 +8,7 @@ import { RunCanvas } from "@/components/run/RunCanvas";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <RunProvider>
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col overflow-x-clip">
       <TopBar />
       <div className="mx-auto flex w-full max-w-[1440px] flex-1">
         <SideNav />

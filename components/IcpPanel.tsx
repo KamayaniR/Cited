@@ -14,10 +14,10 @@ function conf(c: number) {
 function Chip({ label, c, detail }: { label: string; c: number; detail?: string }) {
   const k = conf(c);
   return (
-    <Tip content={`${detail ? `${detail}\n` : ""}Confidence ${c.toFixed(2)}`}>
-      <span className={`inline-flex items-center gap-2 rounded-[7px] border px-2 py-1 text-[12px] ${k.cls}`}>
-        <span className="max-w-[220px] truncate">{label}</span>
-        <span className="h-1 w-6 rounded-full bg-line"><span className={`block h-1 rounded-full ${k.bar}`} style={{ width: `${Math.round(c * 100)}%` }} /></span>
+    <Tip className="inline-flex min-w-0 max-w-full" content={`${label}\n${detail ? `${detail} · ` : ""}confidence ${c.toFixed(2)}`}>
+      <span className={`inline-flex min-w-0 max-w-full items-center gap-2 rounded-[7px] border px-2 py-1 text-[12px] leading-snug ${k.cls}`}>
+        <span className="line-clamp-2 min-w-0 break-words">{label}</span>
+        <span className="h-1 w-6 shrink-0 rounded-full bg-line"><span className={`block h-1 rounded-full ${k.bar}`} style={{ width: `${Math.round(c * 100)}%` }} /></span>
       </span>
     </Tip>
   );
@@ -25,9 +25,9 @@ function Chip({ label, c, detail }: { label: string; c: number; detail?: string 
 
 function Group({ icon: I, title, children }: { icon: Icon; title: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[96px_1fr] items-start gap-2 border-t border-line py-2.5 first:border-0">
+    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-2 border-t border-line py-2.5 first:border-0">
       <span className="flex items-center gap-1.5 pt-1 text-[11px] font-medium text-muted"><I size={13} />{title}</span>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+      <div className="flex min-w-0 flex-wrap gap-1.5">{children}</div>
     </div>
   );
 }
@@ -51,7 +51,7 @@ export function IcpPanel({ ws, refresh }: { ws: Workspace; refresh: () => Promis
         <Group icon={Globe2} title="Regions">{d.regions.value.map((r) => <Chip key={r} label={r} c={d.regions.confidence} />)}</Group>
         <Group icon={UserCircle2} title="Personas">{d.personas.map((p) => <Chip key={p.title} label={p.title} c={p.confidence} detail={p.seniority.replace("_", "-")} />)}</Group>
         <Group icon={Zap} title="Triggers">{d.triggers.map((t) => <Chip key={t.signal} label={t.signal} c={t.confidence} detail="Buying trigger" />)}</Group>
-        <Group icon={Ban} title="Exclude">{d.negativeSignals.map((n) => <Badge key={n} tone="red">{n}</Badge>)}</Group>
+        <Group icon={Ban} title="Exclude">{d.negativeSignals.map((n) => <span key={n} className="max-w-full rounded-[4px] bg-danger/10 px-1.5 py-0.5 text-[11px] leading-snug font-medium break-words text-danger">{n}</span>)}</Group>
       </Card>
       <div>
         <SectionTitle icon={Sparkles} tip="Adjacent segments the agent suggests, each with evidence from search. Accept to add them to discovery.">Expansion segments</SectionTitle>
@@ -61,6 +61,8 @@ export function IcpPanel({ ws, refresh }: { ws: Workspace; refresh: () => Promis
     </div>
   );
 }
+
+const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
 function ExpansionCard({ e, refresh }: { e: Expansion; refresh: () => Promise<unknown> }) {
   const [editing, setEditing] = useState(false);
@@ -72,17 +74,17 @@ function ExpansionCard({ e, refresh }: { e: Expansion; refresh: () => Promise<un
   };
   const tone = e.status === "accepted" || e.status === "adjusted" ? "green" : e.status === "dismissed" ? "red" : "neutral";
   return (
-    <Card className={`p-3 text-[13px] ${e.status === "dismissed" ? "opacity-60" : ""}`}>
-      <div className="flex items-center gap-2">
+    <Card className={`min-w-0 p-3 text-[13px] ${e.status === "dismissed" ? "opacity-60" : ""}`}>
+      <div className="flex items-start gap-2">
         {editing
           ? <input className="flex-1 rounded-[6px] border border-line px-2 py-1 text-[13px] focus:border-accent focus:outline-none" aria-label="Segment" value={text} onChange={(ev) => setText(ev.target.value)} />
-          : <Tip content={e.rationale} className="min-w-0 flex-1"><span className="truncate font-medium">{e.segment}</span></Tip>}
+          : <Tip content={`${e.segment}\n\n${e.rationale}`} className="block min-w-0 flex-1"><span className="line-clamp-2 font-medium">{e.segment}</span></Tip>}
         <Badge tone={tone}>{e.status}</Badge>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {e.evidence.map((ev) => <Tip key={ev.url} content={ev.title}><a href={ev.url} className="inline-flex items-center gap-1 rounded-[5px] bg-accent/10 px-1.5 py-0.5 text-[11px] text-accent hover:bg-accent hover:text-white" target="_blank" rel="noreferrer"><ExternalLink size={11} />{new URL(ev.url).hostname}</a></Tip>)}
+        {e.evidence.map((ev) => <Tip key={ev.url} className="inline-flex min-w-0 max-w-full" content={`${ev.title}\n${ev.url}`}><a href={ev.url} className="inline-flex min-w-0 max-w-[260px] items-center gap-1 rounded-[5px] bg-accent/10 px-1.5 py-0.5 text-[11px] text-accent hover:bg-accent hover:text-white" target="_blank" rel="noreferrer"><ExternalLink size={11} className="shrink-0" /><span className="truncate">{ev.title || hostOf(ev.url)}</span><span className="shrink-0 opacity-60">· {hostOf(ev.url)}</span></a></Tip>)}
         {e.evidence.length === 0 && <span className="text-[11px] text-muted">No evidence found</span>}
-        <span className="ml-auto flex gap-1">
+        <span className="ml-auto flex shrink-0 gap-1">
           {editing ? (
             <><Button onClick={() => decide("adjusted")}>Save</Button><Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button></>
           ) : (

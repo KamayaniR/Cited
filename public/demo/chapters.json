@@ -4,31 +4,31 @@
     "label": "Describe the product"
   },
   {
-    "t": 5.9,
+    "t": 4.9,
     "label": "Approve the ICP"
   },
   {
-    "t": 9.7,
+    "t": 8.7,
     "label": "Run the loop"
   },
   {
-    "t": 16.6,
+    "t": 15.7,
     "label": "Cited companies"
   },
   {
-    "t": 20.2,
+    "t": 19.2,
     "label": "Claim check and approval"
   },
   {
-    "t": 25.3,
+    "t": 24.3,
     "label": "Pipeline"
   },
   {
-    "t": 28.3,
+    "t": 27.4,
     "label": "Knowledge graph"
   },
   {
-    "t": 34.9,
+    "t": 34,
     "label": "Credits and billing"
   }
 ]
