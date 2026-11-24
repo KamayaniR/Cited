@@ -7,7 +7,7 @@ import { MOCK_SEARCH_RESULTS } from "@/lib/seed/fixtures";
 export interface SearchResult { url: string; title: string; content: string; score: number }
 
 /** Web search. Every lead/signal citation must be a URL returned here (see lib/pipeline/citations.ts in P1). */
-export async function search(query: string, opts: { maxResults?: number; includeDomains?: string[] } = {}): Promise<{ results: SearchResult[]; mode: "live" | "mock" }> {
+export async function search(query: string, opts: { maxResults?: number; includeDomains?: string[]; depth?: "basic" | "advanced" } = {}): Promise<{ results: SearchResult[]; mode: "live" | "mock" }> {
   if (mockFor("tavily")) {
     const words = [...new Set(query.toLowerCase().split(/\W+/).filter((w) => w.length > 3))];
     const scored = MOCK_SEARCH_RESULTS
@@ -23,7 +23,7 @@ export async function search(query: string, opts: { maxResults?: number; include
   const res = await vendorFetch("tavily", "https://api.tavily.com/search", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${env.tavilyKey}` },
-    body: JSON.stringify({ query, max_results: opts.maxResults ?? 8, search_depth: "advanced", ...(opts.includeDomains ? { include_domains: opts.includeDomains } : {}) }),
+    body: JSON.stringify({ query, max_results: opts.maxResults ?? 8, search_depth: opts.depth ?? "advanced", ...(opts.includeDomains ? { include_domains: opts.includeDomains } : {}) }),
   });
   if (!res.ok) throw new ApiError("VENDOR_ERROR", `Tavily failed: HTTP ${res.status}`, { vendor: "tavily" });
   const body = (await res.json()) as { results: SearchResult[] };

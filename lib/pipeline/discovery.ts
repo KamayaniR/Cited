@@ -9,6 +9,22 @@ import { DEMO_COMPANIES, DEMO_COMPETITORS } from "@/lib/seed/fixtures";
 import { newId, nowIso } from "@/lib/ids";
 
 export const MAX_QUERIES = 6;
+const EXTRACT_CHUNK = 16;
+
+/** The same company found in two extraction chunks becomes one prospect with all its sources and signals. */
+function mergeProspects(ps: Prospect[]): Prospect[] {
+  const byName = new Map<string, Prospect>();
+  for (const p of ps) {
+    const key = p.name.trim().toLowerCase();
+    const prev = byName.get(key);
+    if (!prev) { byName.set(key, { ...p, sourceUrls: [...p.sourceUrls], signals: [...p.signals] }); continue; }
+    prev.sourceUrls = [...new Set([...prev.sourceUrls, ...p.sourceUrls])];
+    prev.signals.push(...p.signals.filter((s) => !prev.signals.some((x) => x.sourceUrl === s.sourceUrl && x.summary === s.summary)));
+    for (const k of ["domain", "industry", "naics", "region"] as const) if (!prev[k]) prev[k] = p[k];
+    if (!prev.headcount) prev.headcount = p.headcount;
+  }
+  return [...byName.values()];
+}
 
 // ---------- 1. Query building ----------
 /** Up to 6 queries: each ICP industry paired with its strongest triggers, plus accepted expansion segments. */
@@ -119,6 +135,8 @@ export interface DiscoveryOutput {
 const QueriesSchema = z.object({ queries: z.array(z.string()).min(1).transform((q) => q.slice(0, MAX_QUERIES)) });
 
 export async function runDiscovery(input: { icp: Icp; expansions: Expansion[]; product: ProductInput; existingDomains?: string[] }): Promise<DiscoveryOutput> {
+  // Competitor mapping does not depend on the leads, so it runs alongside everything below. A failure there is not fatal.
+  const compP = mapCompetitors(input.product).catch(() => ({ competitors: [] as Competitor[], tokens: 0, costUsd: 0 }));
   const fallback = buildQueries(input.icp, input.expansions);
   const qres = await completeJson({
     task: "discovery_queries",
@@ -129,30 +147,44 @@ export async function runDiscovery(input: { icp: Icp; expansions: Expansion[]; p
   });
   const queries = qres.data.queries;
 
-  // Search, dedupe by URL.
+  // Search all queries at once, dedupe by URL in query order. One failed query does not sink the run.
+  const settled = await Promise.allSettled(queries.map((q) => search(q, { maxResults: 8 })));
+  if (settled.every((x) => x.status === "rejected")) throw (settled[0] as PromiseRejectedResult).reason;
   const seen = new Map<string, SearchResult>();
-  for (const q of queries) {
-    const { results } = await search(q, { maxResults: 8 });
-    for (const r of results) if (!seen.has(r.url)) seen.set(r.url, r);
-  }
+  for (const x of settled) if (x.status === "fulfilled") for (const r of x.value.results) if (!seen.has(r.url)) seen.set(r.url, r);
   const results = [...seen.values()];
   const returnedUrls = results.map((r) => r.url);
 
-  const ext = await completeJson({
+  // Extraction output is the slowest step, so large result sets are split and extracted in parallel.
+  const chunks: SearchResult[][] = [];
+  for (let i = 0; i < results.length; i += EXTRACT_CHUNK) chunks.push(results.slice(i, i + EXTRACT_CHUNK));
+  const exts = await Promise.all(chunks.map((chunk) => completeJson({
     task: "extract_prospects",
     system: `Extract B2B companies that match the ICP from web search results.
 Rules: only companies named in the results (not publishers, vendors or consultancies writing the article); sourceUrls and each signal's sourceUrl must be copied exactly from result URLs; never invent a URL.
 domain: the company's official website domain as you know it (it is verified by search before use).
 Signal type is one of ${SignalTypeEnum.options.join(", ")}; use "negative" for hiring freezes, layoffs, bankruptcy or similar.
 Estimate headcount from the text; give a 6-digit NAICS code.`,
-    prompt: `ICP:\n${JSON.stringify(input.icp)}\n\nSearch results:\n${JSON.stringify(results.map((r) => ({ url: r.url, title: r.title, content: r.content.slice(0, 600) })))}\n\nReturn exactly this shape, every field filled (use "" or 0 when unknown, but never invent):\n{"companies":[{"name":"","domain":"example.com","industry":"","naics":"000000","headcount":0,"region":"United States","sourceUrls":["<result url>"],"signals":[{"type":"hiring","summary":"","sourceUrl":"<result url>"}]}]}`,
+    prompt: `ICP:\n${JSON.stringify(input.icp)}\n\nSearch results:\n${JSON.stringify(chunk.map((r) => ({ url: r.url, title: r.title, content: r.content.slice(0, 600) })))}\n\nReturn exactly this shape, every field filled (use "" or 0 when unknown, but never invent):\n{"companies":[{"name":"","domain":"example.com","industry":"","naics":"000000","headcount":0,"region":"United States","sourceUrls":["<result url>"],"signals":[{"type":"hiring","summary":"","sourceUrl":"<result url>"}]}]}`,
     schema: ProspectSchema,
-    mock: () => mockExtract(results),
+    mock: () => mockExtract(chunk),
     maxTokens: 8000,
-  });
+  })));
+  const ext = { tokens: exts.reduce((n, e) => n + e.tokens, 0), costUsd: exts.reduce((n, e) => n + e.costUsd, 0), mode: exts[0]?.mode ?? "mock" as const };
 
-  const { kept, dropped } = validateCitations(ext.data.companies, returnedUrls);
-  const comp = await mapCompetitors(input.product);
+  const { kept, dropped } = validateCitations(mergeProspects(exts.flatMap((e) => e.data.companies)), returnedUrls);
+
+  // Verify claimed domains with search, all at once (basic depth: only the host matters).
+  const clean = (d: string) => d.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  const verified = await Promise.all(kept.map(async (p) => {
+    const claimed = clean(p.domain);
+    if (!claimed || p.sourceUrls.some((u) => hostOf(u) === claimed)) return "";
+    try {
+      const { results: site } = await search(p.name, { maxResults: 3, includeDomains: [claimed], depth: "basic" });
+      return site.some((r) => hostOf(r.url) === claimed || hostOf(r.url).endsWith(`.${claimed}`)) ? claimed : "";
+    } catch { return ""; }
+  }));
+  const comp = await compP;
 
   const now = nowIso();
   const companies: Company[] = [];
@@ -160,21 +192,12 @@ Estimate headcount from the text; give a 6-digit NAICS code.`,
   const citations: Citation[] = [];
   const skip = new Set(input.existingDomains ?? []);
 
-  for (const p of kept) {
-    // Domain must come from a cited URL when the model left it blank; never guessed from the name.
-    const clean = (d: string) => d.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  for (const [i, p] of kept.entries()) {
+    // Domain must come from a cited URL, or be verified by search; never guessed from the name.
     const claimed = clean(p.domain);
     let finalDomain = p.sourceUrls.map(hostOf).find((h) => claimed && h === claimed) ?? "";
     let domainFromLookup = false;
-    if (!finalDomain) {
-      // Verify the claimed domain with search: accepted only when search returns a page served from it.
-      let hit = "";
-      if (claimed) {
-        const { results: site } = await search(p.name, { maxResults: 3, includeDomains: [claimed] });
-        if (site.some((r) => hostOf(r.url) === claimed || hostOf(r.url).endsWith(`.${claimed}`))) hit = claimed;
-      }
-      if (hit) { finalDomain = hit; domainFromLookup = true; }
-    }
+    if (!finalDomain && verified[i]) { finalDomain = verified[i]; domainFromLookup = true; }
     if (!finalDomain) { dropped.push({ item: p, reason: "No company domain found in cited sources or by search" }); continue; }
     if (skip.has(finalDomain)) continue;
     skip.add(finalDomain);
