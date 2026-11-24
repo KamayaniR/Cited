@@ -1,0 +1,23 @@
+import "server-only";
+import { env, isLive } from "@/lib/env";
+import { ApiError } from "@/lib/api/errors";
+import { MOCK_SEARCH_RESULTS } from "@/lib/seed/fixtures";
+
+export interface SearchResult { url: string; title: string; content: string; score: number }
+
+/** Web search. Every lead/signal citation must be a URL returned here (see lib/pipeline/citations.ts in P1). */
+export async function search(query: string, opts: { maxResults?: number } = {}): Promise<{ results: SearchResult[]; mode: "live" | "mock" }> {
+  if (!isLive("tavily")) {
+    const words = query.toLowerCase().split(/\W+/).filter((w) => w.length > 3);
+    const hits = MOCK_SEARCH_RESULTS.filter((r) => words.some((w) => (r.title + " " + r.content).toLowerCase().includes(w)));
+    return { results: (hits.length ? hits : MOCK_SEARCH_RESULTS).slice(0, opts.maxResults ?? 8), mode: "mock" };
+  }
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${env.tavilyKey}` },
+    body: JSON.stringify({ query, max_results: opts.maxResults ?? 8, search_depth: "advanced" }),
+  });
+  if (!res.ok) throw new ApiError("VENDOR_ERROR", `Tavily failed: HTTP ${res.status}`, { vendor: "tavily" });
+  const body = (await res.json()) as { results: SearchResult[] };
+  return { results: body.results, mode: "live" };
+}

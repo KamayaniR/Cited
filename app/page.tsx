@@ -1,103 +1,56 @@
-import Image from "next/image";
+"use client";
+import Link from "next/link";
+import { useWorkspace } from "@/components/WorkspaceProvider";
+import { Button, Card, PageTitle } from "@/components/ui";
 
-export default function Home() {
+const LOOP = [
+  { n: 1, label: "Intake → ICP, human approves", href: "/intake" },
+  { n: 2, label: "Discovery, citation check, negative filter, scoring", href: "/discovery" },
+  { n: 3, label: "Graph write and multi-hop queries", href: "/graph" },
+  { n: 4, label: "Enrichment (Hunter, Apollo fallback), credit gated", href: "/discovery" },
+  { n: 5, label: "Draft sequence, Reviewer and Security checks", href: "/outreach" },
+  { n: 6, label: "Human approves, edits or rejects", href: "/outreach" },
+  { n: 7, label: "Send to demo inbox, stage update, analytics", href: "/pipeline" },
+];
+
+export default function Overview() {
+  const { ws, loading, loadDemo, reset } = useWorkspace();
+  const stats = ws ? [
+    { label: "Companies", value: ws.companies.filter((c) => !c.excluded).length },
+    { label: "Filtered", value: ws.companies.filter((c) => c.excluded).length },
+    { label: "Leads", value: ws.leads.length },
+    { label: "Awaiting approval", value: ws.messages.filter((m) => m.status === "pending_approval").length },
+    { label: "Citations", value: ws.citations.length },
+  ] : [];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div>
+      <PageTitle kicker="Overview" title="From product description to booked meetings">
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={reset} disabled={loading}>Reset</Button>
+          <Button onClick={loadDemo} disabled={loading}>Load demo data</Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </PageTitle>
+      <div className="grid grid-cols-5 gap-3">
+        {stats.map((s) => (
+          <Card key={s.label} className="p-4">
+            <div className="text-[12px] text-muted">{s.label}</div>
+            <div className="mt-1 font-serif text-2xl">{s.value}</div>
+          </Card>
+        ))}
+      </div>
+      <h2 className="mt-8 mb-3 font-serif text-xl">The loop</h2>
+      <Card>
+        <ol className="divide-y divide-line">
+          {LOOP.map((s) => (
+            <li key={s.n} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
+              <span className="font-mono text-[11px] text-muted">{s.n}</span>
+              <Link href={s.href} className="hover:text-accent hover:underline">{s.label}</Link>
+            </li>
+          ))}
+        </ol>
+      </Card>
+      <p className="mt-4 text-[12px] text-muted">Every claim is cited, every message is approved by a human, and nothing is ever emailed to a real prospect outside production.</p>
     </div>
   );
 }

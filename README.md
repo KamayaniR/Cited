@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cited
 
-## Getting Started
+Cited takes a founder from "here's my product" to qualified meetings booked: it infers an ICP, discovers companies with a source URL for every claim, enriches contacts, drafts outreach, and sends nothing until a human approves it.
 
-First, run the development server:
+> Work in progress. Built in stages P0 to P8 (see "Build status").
+
+## Quick start (mock mode, zero keys)
 
 ```bash
+npm install
+cp .env.example .env.local   # leave it empty for mock mode
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 and click **Load demo data**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Every vendor sits behind an adapter in `lib/providers/` with a mock fallback, so the whole app runs with no API keys. Add a vendor's keys to `.env.local` to switch just that vendor to live mode; the top bar shows which vendors are live.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Live mode
 
-## Learn More
+| Variable | Vendor | Where to get it |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | LLM (Claude) | console.anthropic.com |
+| `TAVILY_API_KEY` | Search | tavily.com |
+| `HUNTER_API_KEY` | Enrichment (primary) | hunter.io → API |
+| `APOLLO_API_KEY` | Enrichment (fallback) | apollo.io → Settings → API |
+| `SENDGRID_API_KEY`, `SENDGRID_FROM` | Email | sendgrid.com (verified sender) |
+| `DEMO_RECIPIENT`, `SENDING_ENABLED` | Safety | Your demo inbox; sending is off unless `true` |
+| `FLEXPRICE_API_KEY` | Billing | flexprice.io |
+| `BAND_API_KEY`, `BAND_ROOM_ID` | Multi-agent | Band |
+| `NEO4J_URI`, `NEO4J_PASSWORD` | Graph | Neo4j Aura Free |
+| `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Database | supabase.com |
+| `CRON_SECRET` | Scheduled refresh | Any random string |
 
-To learn more about Next.js, take a look at the following resources:
+Database: `supabase db push` applies `supabase/migrations/`. The Neo4j schema in `lib/graph/schema.cypher` runs on startup.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Safety
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Nothing is sent unless a rep approved it.
+- Outside production every email goes to `DEMO_RECIPIENT`; `SENDING_ENABLED=false` is a kill switch.
+- LinkedIn messages are drafted only. The rep sends them by hand and clicks "Mark sent".
+- No scraping behind logins. Every lead and signal must cite a URL that search returned.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`npm run dev` · `npm run build` · `npm test` · `npm run typecheck` · `npm run lint`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project structure
+
+```
+app/                 pages + API routes (api/state, api/demo/seed, api/health, api/cron/refresh)
+components/          UI
+lib/
+  providers/         llm, tavily, hunter, apollo, sendgrid, flexprice, band (each with mock fallback)
+  pipeline/          scoring (P0); icp, discovery, enrich, outreach, refresh (P1+)
+  agents/            planner, builder, reviewer, security (P6)
+  graph/             neo4j.ts, schema.cypher; queries (P4)
+  seed/              demo fixtures (fictional .example companies)
+  db/                workspace store (memory in mock mode)
+supabase/migrations/
+docs/
+vercel.json          cron schedule
+```
+
+## Build status
+
+| Stage | Scope | Status |
+|---|---|---|
+| P0 | Skeleton, schema, adapters with mocks, demo seed, app shell | Done |
+| P1 | Intake → ICP → discovery with citations → competitors → scoring | Next |
+| P2 | Enrichment, sequences, HITL queue, demo-inbox send, manual LinkedIn | |
+| P3 | Kanban, attribution, audit, analytics | |
+| P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | |
+| P5 | Flexprice metering and credit gate | |
+| P6 | Band agents and approval cards | |
+| P7 | Pitch slide, docs, demo video | |
+| P8 | Snyk, E2E, monitoring | |
+
+## License
+
+MIT

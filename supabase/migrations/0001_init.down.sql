@@ -1,0 +1,2 @@
+drop table if exists approvals, agent_events, usage_events, audit_log, messages, lead_events, leads, competitors, people, signals, citations, companies, expansions, icps, products, org_members, orgs cascade;
+drop type if exists approval_status_t, approval_kind_t, competitor_category_t, expansion_status_t, signal_type_t, message_status_t, channel_t, email_status_t, actor_t, outcome_t, stage_t, tier_t, source_t;
