@@ -43,11 +43,18 @@ export default function AuditPage() {
     </PageTitle>
   );
   if (!ws?.auditLog.length) return <div>{title}<EmptyState what="audit entries" /></div>;
-  const rows = ws.auditLog.filter((a) => (actor === "all" || a.actor === actor) && (action === "all" || a.action === action));
+  const filtered = ws.auditLog.filter((a) => (actor === "all" || a.actor === actor) && (action === "all" || a.action === action));
+  // Back-to-back identical entries (the same graph query run again) collapse into one row with a ×N count.
+  const rows: (typeof filtered[number] & { n: number })[] = [];
+  for (const a of filtered) {
+    const prev = rows[rows.length - 1];
+    if (prev && prev.action === a.action && prev.detail === a.detail && prev.actor === a.actor) prev.n++;
+    else rows.push({ ...a, n: 1 });
+  }
   return (
     <div>
       {title}
-      <div className="mb-2 text-[11px] text-muted">{rows.length} / {ws.auditLog.length}</div>
+      <div className="mb-2 text-[11px] text-muted">{filtered.length} / {ws.auditLog.length}</div>
       <Card>
         <ol className="divide-y divide-line">
           {rows.map((a) => {
@@ -59,8 +66,9 @@ export default function AuditPage() {
                   <span aria-label={a.actor} className={`grid h-5 w-5 place-items-center rounded-full ${a.actor === "agent" ? "bg-agent/10 text-agent" : "bg-rep/10 text-rep"}`}>{a.actor === "agent" ? <Bot size={11} /> : <User size={11} />}</span>
                 </Tip>
                 <span className="w-[170px] shrink-0 truncate font-medium">{a.action.replace(/_/g, " ")}</span>
-                <Tip content={`${a.detail || "—"}\nTarget: ${a.target}`} className="min-w-0 flex-1"><span className="truncate text-muted">{a.detail || a.target}</span></Tip>
-                <span className="shrink-0 font-mono text-[10px] text-muted">{new Date(a.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                <Tip content={`${a.detail || "—"}\nTarget: ${a.target}`} className="block min-w-0 flex-1"><span className="block truncate text-muted">{a.detail || a.target}</span></Tip>
+                {a.n > 1 && <span className="shrink-0 rounded-full bg-line px-1.5 font-mono text-[10px] text-muted" title={`${a.n} identical entries in a row`}>×{a.n}</span>}
+                <span className="w-[112px] shrink-0 text-right font-mono text-[10px] text-muted">{new Date(a.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
               </li>
             );
           })}
