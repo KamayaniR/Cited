@@ -32,7 +32,7 @@ function Group({ icon: I, title, children }: { icon: Icon; title: string; childr
   );
 }
 
-export function IcpPanel({ ws, refresh }: { ws: Workspace; refresh: () => Promise<void> }) {
+export function IcpPanel({ ws, refresh }: { ws: Workspace; refresh: () => Promise<unknown> }) {
   const icp = ws.icp!;
   const d = icp.data;
   const [busy, setBusy] = useState(false);
@@ -62,7 +62,7 @@ export function IcpPanel({ ws, refresh }: { ws: Workspace; refresh: () => Promis
   );
 }
 
-function ExpansionCard({ e, refresh }: { e: Expansion; refresh: () => Promise<void> }) {
+function ExpansionCard({ e, refresh }: { e: Expansion; refresh: () => Promise<unknown> }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(e.segment);
   const decide = async (status: "accepted" | "adjusted" | "dismissed") => {

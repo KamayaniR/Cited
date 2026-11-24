@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Coins, Cpu, Radio } from "lucide-react";
+import { Coins, Cpu, Radio, Play, Loader2 } from "lucide-react";
+import { useRun } from "./run/RunProvider";
 import { useWorkspace } from "./WorkspaceProvider";
 import { Dot } from "./ui";
 import { Tip } from "./Tip";
@@ -9,6 +10,8 @@ const VENDOR_LABEL: Record<string, string> = { llm: "Claude", tavily: "Tavily", 
 
 export function TopBar() {
   const { ws, modes } = useWorkspace();
+  const { run, runLoop } = useRun();
+  const running = Boolean(run?.active);
   const vendors = modes ? Object.entries(modes.vendors) : [];
   const live = vendors.filter(([, m]) => m === "live").length;
   const tokens = ws?.agentEvents.reduce((s, e) => s + e.tokens, 0) ?? 0;
@@ -33,6 +36,11 @@ export function TopBar() {
           </Tip>
         )}
         <div className="ml-auto flex items-center gap-2 text-[12px]">
+          <Tip side="bottom" content="Run every step that has work: discovery, enrichment, drafting and the claim check. It stops at your approval, because sends always need you.">
+            <button onClick={() => void runLoop()} disabled={running} className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-60">
+              {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}{running ? "Running…" : "Run the loop"}
+            </button>
+          </Tip>
           <Tip side="bottom" content={`${tokens.toLocaleString()} tokens · $${cost.toFixed(2)} LLM spend`}>
             <span className="flex items-center gap-1 text-muted"><Cpu size={13} /><span className="font-mono">${cost.toFixed(2)}</span></span>
           </Tip>

@@ -1,7 +1,7 @@
 import "server-only";
 import { vendorFetch } from "@/lib/monitor";
 import type { z } from "zod";
-import { env, isLive } from "@/lib/env";
+import { env, isLive, mockFor } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 
 export interface LlmResult<T> { data: T; tokens: number; costUsd: number; mode: "live" | "mock"; provider?: "anthropic" | "moss" | "mock" }
@@ -39,7 +39,7 @@ export async function completeJson<S extends z.ZodTypeAny>(opts: {
   mock: () => z.input<S>;
   maxTokens?: number;
 }): Promise<LlmResult<z.infer<S>>> {
-  if (!isLive("llm")) {
+  if (mockFor("llm")) {
     const data = opts.schema.parse(opts.mock());
     const tokens = Math.round((opts.prompt.length + JSON.stringify(data).length) / 4);
     return { data, tokens, costUsd: 0, mode: "mock", provider: "mock" };

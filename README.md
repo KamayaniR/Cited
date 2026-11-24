@@ -39,19 +39,31 @@ A B2B founder with no GTM team describes their product. Cited infers the ideal c
 
 See [docs/system-design.md](docs/system-design.md) for the architecture diagram, the graph ontology, every Cypher query with example output, and the agent reasoning loops.
 
-In short: Next.js App Router pages call API routes; routes call pipeline modules; pipeline modules call vendor adapters in `lib/providers/`, each with a mock fallback. State lives in a workspace store; the graph is mirrored to Neo4j after every change.
+In short: Next.js App Router pages call API routes; routes call pipeline modules; pipeline modules call vendor adapters in `lib/providers/`. Adapters use fixtures only in demo mode. State lives in a workspace store; the graph is mirrored to Neo4j after every change.
 
-## Quick start (mock mode, zero keys)
+## Quick start
+
+Cited has two modes, and they never share data.
+
+**Live mode (default): real data only.** Put your keys in `.env.local`, then run:
 
 ```bash
 npm install
-cp .env.example .env.local   # leave it empty for mock mode
+cp .env.example .env.local   # add your keys
 npm run dev
 ```
 
-Open http://localhost:3000/overview and click **Load demo data**. The landing page is at http://localhost:3000. The seeded demo uses fictional `.example` companies and runs the same way every time.
+Open http://localhost:3000/overview. Describe your product on **Intake & ICP**, approve the ICP, then click **Run the loop** in the top bar. It runs discovery, enrichment, drafting and the claim check, then stops at your approval: sends always need a human. A live canvas shows each step while an agent is running, and closes when it's done.
 
-Every vendor sits behind an adapter with a mock fallback, so the whole app runs with no API keys. Add a vendor's keys to `.env.local` to switch just that vendor to live mode; the top bar shows which vendors are live. `CITED_FORCE_MOCK=true` forces mock mode even with keys set.
+There is no seeded data and no silent mock in live mode. If a data key is missing (Claude, Tavily, Hunter or Apollo), that step fails with a message naming the key. Neo4j, Flexprice and Band fall back to local equivalents that run on the same real data until their keys are set. The landing page is at http://localhost:3000.
+
+**Demo mode: the recorded demo and the E2E tests.** `CITED_FORCE_MOCK=true` runs every vendor on fixtures with fictional `.example` companies, keeps its own workspace file (`.data/demo-workspace.json`), and shows **Load demo data**. The **Demo** tab in the app plays a recording made this way. To re-record it:
+
+```bash
+npm run build
+CITED_FORCE_MOCK=true SENDING_ENABLED=false npx next start -p 3200
+BASE=http://localhost:3200 npm run record-demo   # writes public/demo/cited-demo.webm and chapters.json
+```
 
 ## Environment variables
 

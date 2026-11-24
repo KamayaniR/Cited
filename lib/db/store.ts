@@ -11,12 +11,17 @@ import { mirrorEvent } from "@/lib/providers/band";
  * Mock mode (default): in-memory, persisted to .data/workspace.json so dev reloads keep state.
  * Live mode: the Supabase adapter (lib/db/supabase.ts) replaces this once keys are set (see README).
  */
-const DATA_FILE = path.join(process.cwd(), ".data", "workspace.json");
+// Demo data and real data never share a file: demo mode (CITED_FORCE_MOCK) has its own workspace.
+const DEMO_MODE = process.env.CITED_FORCE_MOCK === "true";
+const DATA_FILE = path.join(process.cwd(), ".data", DEMO_MODE ? "demo-workspace.json" : "workspace.json");
+
+/** Demo companies all live on .example domains; real search never returns those. */
+export const isDemoData = (ws: Pick<Workspace, "companies">) => ws.companies.some((c) => c.domain.endsWith(".example"));
 export const STARTING_CREDITS = 100;
 
 export function emptyWorkspace(): Workspace {
   return {
-    org: { id: "org_demo", name: "Demo workspace", creditsBalance: STARTING_CREDITS },
+    org: { id: DEMO_MODE ? "org_demo" : "org_live", name: DEMO_MODE ? "Demo workspace" : "My workspace", creditsBalance: STARTING_CREDITS },
     product: null, icp: null, expansions: [], companies: [], citations: [], signals: [], people: [],
     competitors: [], team: [], leads: [], leadEvents: [], messages: [], auditLog: [], usageEvents: [], agentEvents: [], approvals: [],
   };
@@ -27,7 +32,12 @@ const g = globalThis as unknown as { __citedWs?: Workspace };
 function load(): Workspace {
   if (g.__citedWs) return g.__citedWs;
   try {
-    g.__citedWs = { ...emptyWorkspace(), ...JSON.parse(fs.readFileSync(DATA_FILE, "utf8")) };
+    const saved = { ...emptyWorkspace(), ...JSON.parse(fs.readFileSync(DATA_FILE, "utf8")) } as Workspace;
+    if (!DEMO_MODE && !process.env.VITEST && isDemoData(saved)) {
+      // An older version kept demo data in the live file. Set it aside so the live app starts clean.
+      fs.renameSync(DATA_FILE, DATA_FILE.replace(/\.json$/, ".demo-backup.json"));
+      g.__citedWs = emptyWorkspace();
+    } else g.__citedWs = saved;
   } catch {
     g.__citedWs = emptyWorkspace();
   }

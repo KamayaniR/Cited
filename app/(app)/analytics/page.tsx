@@ -88,7 +88,7 @@ function Funnel({ row }: { row: FunnelRow }) {
     { label: "Matched", n: row.reached.matched, color: "#9CA3AF" },
     { label: "Contacted", n: row.reached.contacted, color: "#0284C7" },
     { label: "Replied", n: row.reached.replied, color: "#7C3AED" },
-    { label: "Meeting", n: row.reached.meeting_booked, color: "#2F5D50" },
+    { label: "Meeting", n: row.reached.meeting_booked, color: "#0F766E" },
     { label: "Won", n: row.won, color: "#059669" },
   ];
   const max = Math.max(1, row.leads);

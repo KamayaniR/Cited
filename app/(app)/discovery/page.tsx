@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, Sparkles, Users, Linkedin, MailCheck, MailWarning, MailX, Mail, MapPin, Swords, Ban, ExternalLink } from "lucide-react";
 import { api } from "@/components/api";
+import { useRun } from "@/components/run/RunProvider";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { RefreshButton } from "@/components/RefreshButton";
 import { EmptyState } from "@/components/EmptyState";
@@ -22,12 +23,13 @@ const EMAIL: Record<Person["emailStatus"], { icon: typeof Mail; cls: string; lab
 
 function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
   const { ws, refresh } = useWorkspace();
+  const { track } = useRun();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = Boolean(ws?.icp?.approvedAt);
   const run = async () => {
     setBusy(true); setError(null);
-    try { onDone(await api<RunResult>("/api/discover", { method: "POST" })); await refresh(); }
+    try { onDone(await track("discovery", "discovery", () => api<RunResult>("/api/discover", { method: "POST" }))); await refresh(); }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -45,6 +47,7 @@ function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
 
 function EnrichButton() {
   const { ws, refresh } = useWorkspace();
+  const { track } = useRun();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const done = new Set(ws?.leads.map((l) => l.companyId));
@@ -52,7 +55,7 @@ function EnrichButton() {
   const broke = (ws?.org.creditsBalance ?? 0) < 2;
   const run = async () => {
     setBusy(true); setMsg(null);
-    try { const r = await api<{ enriched: number; sources: { hunter: number; apollo: number } }>("/api/enrich", { method: "POST", body: {} }); setMsg(`${r.enriched} enriched · Hunter ${r.sources.hunter} calls, Apollo ${r.sources.apollo}`); }
+    try { const r = await track("enrich", "enrich", () => api<{ enriched: number; sources: { hunter: number; apollo: number } }>("/api/enrich", { method: "POST", body: {} })); setMsg(`${r.enriched} enriched · Hunter ${r.sources.hunter} calls, Apollo ${r.sources.apollo}`); }
     catch (e) { setMsg((e as Error).message); }
     finally { setBusy(false); await refresh(); }
   };

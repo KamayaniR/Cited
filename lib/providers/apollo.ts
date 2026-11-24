@@ -1,6 +1,6 @@
 import "server-only";
 import { vendorFetch } from "@/lib/monitor";
-import { env, isLive } from "@/lib/env";
+import { env, mockFor } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 import { mockPersonContact, mockCompanyInfo } from "@/lib/seed/fixtures";
 
@@ -21,7 +21,7 @@ async function post(path: string, body: Record<string, unknown>) {
 
 /** Fallback only: called for fields Hunter left empty. */
 export async function matchPerson(p: { firstName: string; lastName: string; domain: string }) {
-  if (!isLive("apollo")) {
+  if (mockFor("apollo")) {
     const m = mockPersonContact(p.domain, p.firstName, p.lastName);
     return { email: m.apolloEmail, linkedinUrl: m.apolloLinkedin, previouslyAt: m.previouslyAt, school: m.school, source: "mock" as const };
   }
@@ -32,7 +32,7 @@ export async function matchPerson(p: { firstName: string; lastName: string; doma
 }
 
 export async function enrichOrg(domain: string) {
-  if (!isLive("apollo")) {
+  if (mockFor("apollo")) {
     const m = mockCompanyInfo(domain);
     return { hq: m.apolloHq, source: "mock" as const };
   }

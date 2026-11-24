@@ -12,7 +12,7 @@ const STATUS: Record<Message["status"], { tone: Tone; label: string }> = {
   approved: { tone: "blue", label: "approved" }, rejected: { tone: "red", label: "rejected" }, sent: { tone: "green", label: "sent" },
 };
 
-export function MessageCard({ m, person, signals, refresh }: { m: Message; person: Person; signals: Signal[]; refresh: () => Promise<void> }) {
+export function MessageCard({ m, person, signals, refresh }: { m: Message; person: Person; signals: Signal[]; refresh: () => Promise<unknown> }) {
   const [editing, setEditing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [subject, setSubject] = useState(m.subject ?? "");

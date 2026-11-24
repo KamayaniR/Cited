@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { captureError, record402 } from "@/lib/monitor";
+import { MissingKeyError } from "@/lib/env";
 
 export type ErrorCode =
   | "VALIDATION_ERROR" | "UNAUTHORIZED" | "CREDIT_LIMIT" | "NOT_FOUND"
@@ -23,6 +24,9 @@ export function errorResponse(err: unknown) {
     if (err.code === "CREDIT_LIMIT") record402();
     if (err.code === "VENDOR_ERROR") captureError(err, { code: err.code, ...err.details });
     return NextResponse.json({ error: { code: err.code, message: err.message, details: err.details }, ...err.extra }, { status: STATUS[err.code] });
+  }
+  if (err instanceof MissingKeyError) {
+    return NextResponse.json({ error: { code: "VENDOR_ERROR", message: err.message, details: { vendor: err.vendor, missingKey: true } } }, { status: 503 });
   }
   if (err instanceof ZodError) {
     return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Invalid request", details: { issues: err.issues } } }, { status: 400 });

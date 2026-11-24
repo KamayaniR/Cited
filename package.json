@@ -10,11 +10,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "next build && playwright test",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "record-demo": "node scripts/record-demo.mjs"
   },
   "dependencies": {
     "@moss-js/moss": "^1.26.0",
     "@supabase/supabase-js": "^2.119.2",
+    "graphology": "^0.25.4",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "lucide-react": "^0.468.0",
     "neo4j-driver": "^6.3.2",
     "next": "15.5.29",
@@ -33,6 +36,7 @@
     "@vitest/coverage-v8": "^3.2.7",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
+    "graphology-types": "^0.24.8",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.7"

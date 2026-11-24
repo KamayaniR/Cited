@@ -19,7 +19,7 @@ const STAGES: { stage: Stage; label: string }[] = [
 ];
 
 export default function Overview() {
-  const { ws, loading, loadDemo, reset } = useWorkspace();
+  const { ws, loading, loadDemo, reset, modes } = useWorkspace();
   const live = ws?.companies.filter((c) => !c.excluded) ?? [];
   const tiers = { A: live.filter((c) => c.tier === "A").length, B: live.filter((c) => c.tier === "B").length, C: live.filter((c) => c.tier === "C").length };
   const pending = ws?.messages.filter((m) => m.status === "pending_approval" || m.status === "needs_fix").length ?? 0;
@@ -31,7 +31,7 @@ export default function Overview() {
     <div>
       <PageTitle icon={Database} title="Overview" tip="From product description to booked meetings. Every claim is cited, every message is approved by a human, and nothing is emailed to a real prospect outside production.">
         <Button variant="secondary" icon={RotateCcw} onClick={reset} disabled={loading}>Reset</Button>
-        <Button onClick={loadDemo} disabled={loading}>Load demo data</Button>
+        {modes?.demo && <Button onClick={loadDemo} disabled={loading}>Load demo data</Button>}
       </PageTitle>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">

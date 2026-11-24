@@ -5,19 +5,21 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Button, Toast } from "@/components/ui";
 import { Tip } from "@/components/Tip";
 import { api } from "@/components/api";
+import { useRun } from "@/components/run/RunProvider";
 
 interface RefreshResult { processed: number; added: number; skippedForCredits: number; filtered: string[]; tierChanges: { name: string; from: string; to: string; score: number }[] }
 
 /** "Run refresh now": the same code path as the 6-hourly cron, so judges don't have to wait. */
 export function RefreshButton({ variant = "secondary" }: { variant?: "primary" | "secondary" }) {
   const { ws, refresh } = useWorkspace();
+  const { track } = useRun();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const last = ws?.companies.map((c) => c.signalsRefreshedAt).sort().at(-1);
   const run = async () => {
     setBusy(true); setMsg(null);
     try {
-      const r = await api<RefreshResult>("/api/signals/refresh", { method: "POST", body: {} });
+      const r = await track("refresh", "discovery", () => api<RefreshResult>("/api/signals/refresh", { method: "POST", body: {} }));
       const tiers = r.tierChanges.map((t) => `${t.name} ${t.from}→${t.to}`).join(", ");
       setMsg(`${r.processed} refreshed · +${r.added} signals${tiers ? ` · ${tiers}` : ""}${r.filtered.length ? ` · ${r.filtered.length} filtered` : ""}${r.skippedForCredits ? ` · ${r.skippedForCredits} skipped (credits)` : ""}`);
     } catch (e) { setMsg((e as Error).message); }

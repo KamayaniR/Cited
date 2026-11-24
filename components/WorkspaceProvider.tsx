@@ -2,8 +2,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { Workspace } from "@/lib/types";
 
-type Modes = { vendors: Record<string, "live" | "mock">; band: "live" | "local"; graph: "neo4j" | "memory" };
-interface Ctx { ws: Workspace | null; modes: Modes | null; loading: boolean; refresh: () => Promise<void>; loadDemo: () => Promise<void>; reset: () => Promise<void> }
+type Modes = { vendors: Record<string, "live" | "mock">; band: "live" | "local"; graph: "neo4j" | "memory"; demo: boolean };
+interface Ctx { ws: Workspace | null; modes: Modes | null; loading: boolean; refresh: () => Promise<Workspace | null>; loadDemo: () => Promise<void>; reset: () => Promise<void> }
 
 const WorkspaceCtx = createContext<Ctx | null>(null);
 
@@ -18,6 +18,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setWs(body.workspace);
     setModes(body.modes);
     setLoading(false);
+    return body.workspace as Workspace;
   }, []);
 
   const loadDemo = useCallback(async () => {

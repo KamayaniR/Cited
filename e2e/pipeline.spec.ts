@@ -122,3 +122,27 @@ test("claim check blocks an unsupported edit, and the credit gate returns 402", 
 
   expect(errors).toEqual([]);
 });
+
+test("the run canvas shows only while an agent runs, and the loop stops at your approval", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.request.post("/api/intake", { data: { name: "Ledgerlight", description: "Ledgerlight automates the month-end close for mid-market finance teams.", customers: "Controllers and CFOs", regions: ["United States"], excludeRegions: [], teamBackground: "Co-founder Maya Chen was at Stratus Data" } });
+  await page.request.patch("/api/icp", { data: { approve: true } });
+
+  await page.goto("/overview");
+  const canvas = page.getByRole("region", { name: "Agent run" });
+  await expect(canvas).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Run the loop" }).click();
+  await expect(canvas).toBeVisible();
+  await expect(canvas.locator('[data-step="approval"]')).toHaveAttribute("data-status", "needs_you", { timeout: 30_000 });
+  for (const step of ["discovery", "enrich", "draft", "claim", "security"]) await expect(canvas.locator(`[data-step="${step}"]`)).toHaveAttribute("data-status", "done");
+
+  // Nothing was sent: the loop waits for a human.
+  const s = await state(page);
+  expect(s.workspace.messages.length).toBeGreaterThan(0);
+  expect(s.workspace.messages.filter((m) => m.status === "sent")).toHaveLength(0);
+
+  await canvas.getByRole("button", { name: "Close run view" }).click();
+  await expect(canvas).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

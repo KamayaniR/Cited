@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${serif.variable} ${mono.variable} antialiased`}>
+    <html lang="en" className={`${inter.variable} ${serif.variable} ${mono.variable}`}>
+      <body className="antialiased">
         <WorkspaceProvider>{children}</WorkspaceProvider>
       </body>
     </html>

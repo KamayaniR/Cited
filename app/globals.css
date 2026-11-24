@@ -4,14 +4,14 @@
 @theme {
   --color-paper: #FAF9F6;
   --color-ink: #14161A;
-  --color-accent: #2F5D50;
+  --color-accent: #7C3AED;
   --color-muted: #6B7280;
   --color-line: #E5E5E5;
   --color-tier-a: #059669;
   --color-tier-b: #D97706;
   --color-tier-c: #9CA3AF;
   --color-danger: #E11D48;
-  --color-agent: #7C3AED;
+  --color-agent: #4F46E5;
   --color-rep: #0284C7;
   --font-serif: var(--font-source-serif), Georgia, serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
@@ -27,3 +27,23 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
 }
+
+/* Live agent run canvas */
+@keyframes run-in { from { transform: translateY(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes run-flow { to { stroke-dashoffset: -24 } }
+@keyframes run-shimmer { 0%, 100% { box-shadow: 0 0 0 4px rgba(124, 58, 237, .10) } 50% { box-shadow: 0 0 0 7px rgba(124, 58, 237, .20) } }
+@keyframes run-attn { 0%, 100% { box-shadow: 0 0 0 3px rgba(217, 119, 6, .12) } 50% { box-shadow: 0 0 0 7px rgba(217, 119, 6, .24) } }
+@keyframes run-loop { to { transform: rotate(-360deg) } }
+.run-in { animation: run-in .35s cubic-bezier(.2, .8, .2, 1) both }
+.run-flow { animation: run-flow .8s linear infinite }
+.run-shimmer { animation: run-shimmer 1.4s ease-in-out infinite }
+.run-attn { animation: run-attn 1.4s ease-in-out infinite }
+.run-loop { animation: run-loop 1.6s linear infinite }
+@media (prefers-reduced-motion: reduce) { .run-in, .run-flow, .run-shimmer, .run-attn, .run-loop { animation: none } }
+
+/* Landing page */
+@keyframes landing-token { 0% { left: 24px; opacity: 0 } 8% { opacity: 1 } 80% { left: calc(100% - 34px); opacity: 1 } 100% { left: calc(100% - 34px); opacity: 0 } }
+.landing-token { animation: landing-token 4.5s cubic-bezier(.5, 0, .3, 1) infinite }
+@keyframes landing-glow { 0%, 100% { opacity: .55; transform: scale(1) } 50% { opacity: .85; transform: scale(1.06) } }
+.landing-glow { animation: landing-glow 9s ease-in-out infinite }
+@media (prefers-reduced-motion: reduce) { .landing-token, .landing-glow { animation: none } }

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Company, Icp, Signal, Tier, Workspace } from "@/lib/types";
 import { SignalTypeEnum } from "@/lib/types";
 import { getWorkspace, mutate, audit, agentEvent } from "@/lib/db/store";
-import { isLive } from "@/lib/env";
+import { mockFor } from "@/lib/env";
 import { search } from "@/lib/providers/tavily";
 import { completeJson } from "@/lib/providers/llm";
 import { CREDIT_PRICES } from "@/lib/providers/flexprice";
@@ -42,7 +42,7 @@ export function refreshQueue(ws: Workspace, companyIds?: string[]): Company[] {
 export async function fetchFreshSignals(company: Company, icp: Icp): Promise<{ signals: FreshSignal[]; mode: "live" | "mock" }> {
   // Demo companies live on the reserved .example TLD: never search the web for them (a real
   // company with the same name would be attached to the fictional one).
-  if (!isLive("tavily") || !isLive("llm") || company.domain.endsWith(".example")) {
+  if (company.domain.endsWith(".example") || mockFor("tavily") || mockFor("llm")) {
     const fx = MOCK_REFRESH_SIGNALS[company.domain] ?? [];
     return { signals: fx.map((s) => ({ type: s.type, summary: s.summary, url: `https://${company.domain}${s.path}`, title: `${company.name}: ${s.summary}` })), mode: "mock" };
   }

@@ -30,7 +30,32 @@ export const env = {
   demoRecipient: process.env.DEMO_RECIPIENT,
   sendingEnabled: process.env.SENDING_ENABLED === "true",
   forceMock: process.env.CITED_FORCE_MOCK === "true",
+  /** Tests (and anyone who sets CITED_ALLOW_MOCK) may fall back to mocks when a key is missing. The live app never does. */
+  get allowMock() { return process.env.CITED_ALLOW_MOCK === "true" || Boolean(process.env.VITEST); },
 };
+
+/** Vendors that produce data the user sees. In live mode a missing key is an error, never made-up results. */
+export const DATA_VENDORS: Vendor[] = ["llm", "tavily", "hunter", "apollo"];
+
+const KEY_NAMES: Partial<Record<Vendor, string>> = { llm: "ANTHROPIC_API_KEY", tavily: "TAVILY_API_KEY", hunter: "HUNTER_API_KEY", apollo: "APOLLO_API_KEY" };
+
+export class MissingKeyError extends Error {
+  constructor(public vendor: Vendor) { super(`${KEY_NAMES[vendor] ?? vendor} is not set. Add it to .env.local to run this step on real data.`); }
+}
+
+/**
+ * Should this call use the mock? Demo mode (CITED_FORCE_MOCK) always does. In the live app a data vendor
+ * without its key throws MissingKeyError, so nothing invented ever reaches the screen.
+ */
+export function mockFor(v: Vendor): boolean {
+  if (env.forceMock) return true;
+  if (isLive(v)) return false;
+  if (DATA_VENDORS.includes(v) && !env.allowMock) throw new MissingKeyError(v);
+  return true;
+}
+
+/** Demo mode = the deterministic demo-data workspace (E2E tests, recording the demo video). */
+export function isDemoMode(): boolean { return env.forceMock; }
 
 export type Vendor =
   | "llm" | "tavily" | "hunter" | "apollo" | "sendgrid"

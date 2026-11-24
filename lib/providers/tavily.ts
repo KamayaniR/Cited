@@ -1,6 +1,6 @@
 import "server-only";
 import { vendorFetch } from "@/lib/monitor";
-import { env, isLive } from "@/lib/env";
+import { env, mockFor } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 import { MOCK_SEARCH_RESULTS } from "@/lib/seed/fixtures";
 
@@ -8,7 +8,7 @@ export interface SearchResult { url: string; title: string; content: string; sco
 
 /** Web search. Every lead/signal citation must be a URL returned here (see lib/pipeline/citations.ts in P1). */
 export async function search(query: string, opts: { maxResults?: number; includeDomains?: string[] } = {}): Promise<{ results: SearchResult[]; mode: "live" | "mock" }> {
-  if (!isLive("tavily")) {
+  if (mockFor("tavily")) {
     const words = [...new Set(query.toLowerCase().split(/\W+/).filter((w) => w.length > 3))];
     const scored = MOCK_SEARCH_RESULTS
       .map((r) => ({ r, n: words.filter((w) => (r.title + " " + r.content).toLowerCase().includes(w)).length }))

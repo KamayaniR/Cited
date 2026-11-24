@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Badge, Card, PageTitle, Stat } from "@/components/ui";
 import { Tip, InfoTip } from "@/components/Tip";
@@ -8,8 +8,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { RefreshButton } from "@/components/RefreshButton";
 import { api } from "@/components/api";
 import type { QueryKey, WarmRow, HiringRow, DisplacementRow } from "@/lib/graph/queries";
+import { GraphNetwork, LABEL_COLOR, type NetNode, type NetEdge } from "@/components/GraphNetwork";
 
-interface Stats { engine: "neo4j" | "memory"; nodes: Record<string, number>; edges: Record<string, number>; nodeCount: number; edgeCount: number }
+interface Stats { engine: "neo4j" | "memory"; nodes: Record<string, number>; edges: Record<string, number>; nodeCount: number; edgeCount: number; graph?: { nodes: NetNode[]; edges: NetEdge[] } }
 interface Result { q: QueryKey; title: string; question: string; rows: unknown[]; engine: "neo4j" | "memory"; cypher: string; ms: number; fallback?: string }
 
 const TABS: { key: QueryKey; label: string; icon: typeof Share2; tip: string }[] = [
@@ -36,7 +37,8 @@ export default function GraphPage() {
   }, [refresh]);
 
   const companyCount = ws?.companies.length ?? 0;
-  useEffect(() => { if (companyCount) api<Stats>("/api/graph").then(setStats).catch(() => {}); }, [companyCount, ws?.signals.length]);
+  useEffect(() => { if (companyCount) api<Stats>("/api/graph?full=1").then(setStats).catch(() => {}); }, [companyCount, ws?.signals.length, ws?.people.length, ws?.companies]);
+  const highlight = useMemo(() => (res && stats?.graph ? matchRows(res, stats.graph.nodes) : null), [res, stats]);
 
   const title = <PageTitle icon={Share2} title="Knowledge graph" tip="Companies, people, signals, competitors, schools and our team as a graph. Multi-hop queries find the warm way in. 0.5 credits per query."><RefreshButton /></PageTitle>;
   if (!has) return (<div>{title}<EmptyState what="companies" /></div>);
@@ -73,7 +75,6 @@ export default function GraphPage() {
       </div>
 
       {error && <div role="alert" className="mb-3 rounded-[6px] bg-danger/10 px-3 py-2 text-[13px] text-danger">{error}</div>}
-      {!res && !busy && <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Share2 size={20} />Pick a query</Card>}
       {busy && <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Share2 size={20} className="animate-pulse" />Running…</Card>}
 
       {res && !busy && (
@@ -100,8 +101,35 @@ export default function GraphPage() {
           </Card>
         </div>
       )}
+
+      {stats?.graph && (
+        <Card className="mt-4 overflow-hidden">
+          <div className="flex flex-wrap items-center gap-3 border-b border-line px-3 py-2 text-[11px] text-muted">
+            <span className="flex items-center gap-1.5 font-semibold tracking-wider uppercase"><Share2 size={13} />Network</span>
+            {Object.entries(LABEL_COLOR).filter(([k]) => stats.nodes[k]).map(([k, c]) => <span key={k} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{k}</span>)}
+            <span className="ml-auto">{highlight?.size ? `${res?.title}: ${highlight.size} nodes lit` : "Run a query to light up its path"}</span>
+          </div>
+          <GraphNetwork nodes={stats.graph.nodes} edges={stats.graph.edges} highlight={highlight} />
+        </Card>
+      )}
     </div>
   );
+}
+
+/** The nodes a query's rows touch: their companies, people, team members, schools, competitors and evidence pages. */
+function matchRows(res: Result, nodes: NetNode[]): Set<string> {
+  const ids = new Set<string>();
+  const byName = new Map<string, string[]>();
+  for (const n of nodes) { const k = String(n.props.name ?? "").toLowerCase(); if (k) byName.set(k, [...(byName.get(k) ?? []), n.id]); }
+  const addName = (x: string | null | undefined) => { if (x) for (const id of byName.get(x.toLowerCase()) ?? []) ids.add(id); };
+  const addUrl = (u: string) => { for (const n of nodes) if (n.props.url === u) ids.add(n.id); };
+  for (const r of res.rows as (WarmRow & HiringRow & DisplacementRow)[]) {
+    ids.add(r.companyId);
+    if (res.q === "warm") { addName(r.team); addName(r.via); addName(r.person); }
+    if (res.q === "hiring") { addName(r.buyer); addUrl(r.hiringUrl); }
+    if (res.q === "displacement") { addName(r.buyer); addName(r.competitor); addUrl(r.evidenceUrl); }
+  }
+  return ids;
 }
 
 function Node({ kind, children, school }: { kind: "team" | "via" | "person" | "company"; children: React.ReactNode; school?: boolean }) {

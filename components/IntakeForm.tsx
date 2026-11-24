@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Card, Segmented } from "./ui";
 import { MessageCircle, FileText, Sparkles, Bot, Check, Loader2, SendHorizontal, Target } from "lucide-react";
 import { api } from "./api";
+import { useWorkspace } from "./WorkspaceProvider";
 import { DEMO_PRODUCT } from "@/lib/seed/fixtures";
 
 type Form = { name: string; description: string; customers: string; pricing: string; constraints: string; teamBackground: string; regions: string; excludeRegions: string };
@@ -32,7 +33,8 @@ const FIELDS: { key: keyof Form; label: string; area?: boolean }[] = [
 
 const inputCls = "w-full rounded-[6px] border border-line bg-white px-2.5 py-1.5 text-[13px] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
 
-export function IntakeForm({ onDone }: { onDone: () => Promise<void> }) {
+export function IntakeForm({ onDone }: { onDone: () => Promise<unknown> }) {
+  const { modes } = useWorkspace();
   const [mode, setMode] = useState<"chat" | "form">("chat");
   const [form, setForm] = useState<Form>(EMPTY);
   const [step, setStep] = useState(0);
@@ -70,7 +72,7 @@ export function IntakeForm({ onDone }: { onDone: () => Promise<void> }) {
     <Card className="p-4">
       <div className="mb-3 flex items-center gap-2">
         <Segmented value={mode} onChange={setMode} options={[{ value: "chat", label: "Chat", icon: MessageCircle }, { value: "form", label: "Form", icon: FileText }]} />
-        <Button variant="ghost" icon={Sparkles} onClick={useExample} className="ml-auto text-accent">Use example</Button>
+        {modes?.demo && <Button variant="ghost" icon={Sparkles} onClick={useExample} className="ml-auto text-accent">Use example</Button>}
       </div>
 
       {mode === "chat" ? (

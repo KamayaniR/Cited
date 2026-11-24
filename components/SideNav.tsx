@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquareText, Search, Share2, Inbox, KanbanSquare, BarChart3, CreditCard, ScrollText } from "lucide-react";
+import { LayoutDashboard, MessageSquareText, Search, Share2, Inbox, KanbanSquare, BarChart3, CreditCard, ScrollText, PlayCircle } from "lucide-react";
 import { useWorkspace } from "./WorkspaceProvider";
 import type { Workspace } from "@/lib/types";
 
@@ -15,6 +15,7 @@ const TABS: { href: string; label: string; icon: typeof Inbox; count?: (ws: Work
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/billing", label: "Billing", icon: CreditCard },
   { href: "/audit", label: "Audit log", icon: ScrollText },
+  { href: "/demo", label: "Demo", icon: PlayCircle },
 ];
 
 export function SideNav() {

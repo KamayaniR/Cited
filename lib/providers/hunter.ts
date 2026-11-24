@@ -1,6 +1,6 @@
 import "server-only";
 import { vendorFetch } from "@/lib/monitor";
-import { env, isLive } from "@/lib/env";
+import { env, mockFor } from "@/lib/env";
 import { ApiError } from "@/lib/api/errors";
 import { mockPersonContact, mockCompanyInfo, DEMO_COMPANIES } from "@/lib/seed/fixtures";
 
@@ -20,7 +20,7 @@ async function get(path: string, params: Record<string, string>) {
 
 /** Email Finder + Email Verifier (status and MX). */
 export async function findAndVerifyEmail(domain: string, firstName: string, lastName: string): Promise<HunterEmail> {
-  if (!isLive("hunter")) {
+  if (mockFor("hunter")) {
     const m = mockPersonContact(domain, firstName, lastName);
     return { email: m.hunterEmail, status: m.hunterStatus, mx: m.hunterEmail !== null, linkedinUrl: m.hunterLinkedin, source: "mock" };
   }
@@ -32,7 +32,7 @@ export async function findAndVerifyEmail(domain: string, firstName: string, last
 }
 
 export async function verifyEmail(email: string): Promise<HunterEmail> {
-  if (!isLive("hunter")) return { email, status: "valid", mx: true, linkedinUrl: null, source: "mock" };
+  if (mockFor("hunter")) return { email, status: "valid", mx: true, linkedinUrl: null, source: "mock" };
   const v = await get("/email-verifier", { email });
   const raw = (v?.status as string) ?? "unknown";
   const status: Status = raw === "valid" ? "valid" : raw === "accept_all" ? "accept_all" : raw === "invalid" ? "invalid" : "unknown";
@@ -41,7 +41,7 @@ export async function verifyEmail(email: string): Promise<HunterEmail> {
 
 /** Company Enrichment by domain: HQ location. */
 export async function enrichCompany(domain: string): Promise<HunterCompany> {
-  if (!isLive("hunter")) {
+  if (mockFor("hunter")) {
     const m = mockCompanyInfo(domain);
     return { domain, hq: m.hunterHq, source: "mock" };
   }
@@ -55,7 +55,7 @@ export interface HunterContact { firstName: string; lastName: string; position: 
 
 /** Domain Search: people at a company (names and titles). Used to pick the buyer before Email Finder. */
 export async function domainSearch(domain: string): Promise<{ contacts: HunterContact[]; source: "hunter" | "mock" }> {
-  if (!isLive("hunter")) {
+  if (mockFor("hunter")) {
     const c = DEMO_COMPANIES.find((x) => x.domain === domain);
     return { contacts: (c?.people ?? []).map((p) => ({ firstName: p.first, lastName: p.last, position: p.title, seniority: p.seniority })), source: "mock" };
   }

@@ -6,6 +6,7 @@ import { Avatar, Badge, Button, Card, PageTitle, ScoreRing, Segmented, Toast } f
 import { Tip } from "@/components/Tip";
 import { MessageCard } from "@/components/MessageCard";
 import { api } from "@/components/api";
+import { useRun } from "@/components/run/RunProvider";
 import { EvidenceSearch } from "@/components/EvidenceSearch";
 import { ApprovalCards, CheckBandButton } from "@/components/ApprovalCards";
 
@@ -18,6 +19,7 @@ type F = keyof typeof FILTERS;
 
 export default function OutreachPage() {
   const { ws, refresh } = useWorkspace();
+  const { track } = useRun();
   const [filter, setFilter] = useState<F>("open");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export default function OutreachPage() {
   const undrafted = ws ? ws.leads.filter((l) => l.stage === "matched" && !ws.messages.some((m) => m.leadId === l.id)).length : 0;
   const generate = async () => {
     setBusy(true); setMsg(null);
-    try { const r = await api<{ messages: unknown[]; batch: string | null }>("/api/outreach/generate", { method: "POST", body: {} }); setMsg(`Batch ${r.batch} · ${r.messages.length} drafted, reviewed, security-checked`); }
+    try { const r = await track("draft", "draft", () => api<{ messages: unknown[]; batch: string | null }>("/api/outreach/generate", { method: "POST", body: {} })); setMsg(`Batch ${r.batch} · ${r.messages.length} drafted, reviewed, security-checked`); }
     catch (e) { setMsg((e as Error).message); }
     finally { setBusy(false); await refresh(); }
   };
