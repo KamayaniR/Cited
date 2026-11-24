@@ -4,7 +4,7 @@ import { Reveal } from "@/components/landing/motion";
 import { HeroBackdrop, HeroFeed, AppWindow, OldWay, Board, CHAPTERS } from "@/components/landing/V2";
 
 /**
- * Landing page: cream, violet and green, Fraunces headings. "Proof in every pitch."
+ * Landing page: cream, violet and green, Fraunces headings. "Every claim, cited."
  * Motion explains the product (claims tick, a bad one is struck out); all of it stops under reduced motion.
  */
 
@@ -34,11 +34,11 @@ export default function Landing() {
         <div className="relative mx-auto grid max-w-[1240px] items-center gap-10 px-6 pt-40 pb-24 lg:grid-cols-[1.05fr_1fr]">
           <div className="c-rise">
             <span className="inline-block rounded-[6px] bg-white/70 px-2.5 py-1 font-mono text-[11px] tracking-[0.12em]">AI GO-TO-MARKET ENGINE</span>
-            <h1 className="mt-6 font-serif text-[64px] leading-[0.95] tracking-[-0.03em] md:text-[96px]">Proof in<br />every <em className="text-accent">pitch.</em></h1>
-            <p className="mt-6 max-w-[500px] text-[18px] leading-relaxed text-ink/70">Tell Cited what you sell. Its agents find who needs it, back every line with a source, and wait for your go.</p>
+            <h1 className="mt-6 font-serif text-[64px] leading-[0.95] tracking-[-0.03em] md:text-[96px]">Every claim,<br /><em className="text-accent">cited.</em></h1>
+            <p className="mt-6 max-w-[500px] text-[18px] leading-relaxed text-ink/70">Tell Cited what you sell. It finds companies that need it, writes outreach where every fact links to its source, and sends nothing until you say so.</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/overview" className="inline-flex items-center gap-2 rounded-[10px] bg-ink px-5 py-3.5 text-[15px] font-semibold text-[#FBF7F0] hover:bg-ink/85">Run it live <ArrowRight size={15} /></Link>
-              <Link href="/demo" className="c-glass inline-flex items-center gap-2 rounded-[10px] px-5 py-3.5 text-[15px] font-semibold hover:bg-white"><Play size={14} />Watch the replay</Link>
+              <Link href="/overview" className="inline-flex items-center gap-2 rounded-[10px] bg-ink px-5 py-3.5 text-[15px] font-semibold text-[#FBF7F0] hover:bg-ink/85">Try it live <ArrowRight size={15} /></Link>
+              <Link href="/demo" className="c-glass inline-flex items-center gap-2 rounded-[10px] px-5 py-3.5 text-[15px] font-semibold hover:bg-white"><Play size={14} />Watch a recorded run</Link>
             </div>
           </div>
           <div className="hidden lg:block"><HeroFeed /></div>
@@ -51,14 +51,14 @@ export default function Landing() {
 
       <section id="why" className="mx-auto max-w-[1160px] px-6 py-20">
         <Reveal className="text-center">
-          <h2 className="font-serif text-[44px] leading-[1.05] tracking-[-0.02em] md:text-[56px]">The old way <em className="text-accent">leaks</em> proof.</h2>
-          <p className="mx-auto mt-3 max-w-[560px] text-[15px] text-ink/60">A list tool, an enrichment tool, a sequencer and an AI writer. Every hand-off drops the source. Cited keeps it from first signal to sent email.</p>
+          <h2 className="font-serif text-[44px] leading-[1.05] tracking-[-0.02em] md:text-[56px]">Where the <em className="text-accent">source</em> gets lost.</h2>
+          <p className="mx-auto mt-3 max-w-[560px] text-[15px] text-ink/60">Most teams pull leads from one tool, enrich them in another and write in a third. By the time an email goes out, nobody can say where a fact came from. Cited keeps the link the whole way.</p>
         </Reveal>
         <Reveal className="mt-12"><OldWay /></Reveal>
       </section>
 
       <section id="how" className="mx-auto max-w-[1160px] px-6 py-20">
-        <Reveal><h2 className="max-w-[640px] font-serif text-[44px] leading-[1.05] tracking-[-0.02em] md:text-[56px]">From two lines to a <em className="text-accent">booked</em> meeting.</h2></Reveal>
+        <Reveal><h2 className="max-w-[640px] font-serif text-[44px] leading-[1.05] tracking-[-0.02em] md:text-[56px]">How a <em className="text-accent">run</em> works.</h2></Reveal>
         <div className="mt-14 space-y-24">
           {CHAPTERS.map((c, i) => (
             <div key={c.n} className={`grid items-center gap-10 md:grid-cols-2 ${i % 2 ? "md:[&>*:first-child]:order-2" : ""}`}>
@@ -97,11 +97,11 @@ export default function Landing() {
         <Reveal>
           <div className="relative overflow-hidden rounded-[32px] bg-ink px-8 py-20 text-center text-[#FBF7F0]">
             <span aria-hidden className="c-float absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-accent/50 blur-[80px]" />
-            <h2 className="relative font-serif text-[44px] leading-[1.05] tracking-[-0.02em] md:text-[56px]">Watch it catch a <em className="text-[#B9A0FF]">bad claim.</em></h2>
-            <p className="relative mx-auto mt-4 max-w-[460px] text-[15px] text-white/60">Run the loop on your own product. Every sentence is checked before it reaches you.</p>
+            <h2 className="relative font-serif text-[44px] leading-[1.05] tracking-[-0.02em] md:text-[56px]">See it catch a claim it <em className="text-[#B9A0FF]">can’t back up.</em></h2>
+            <p className="relative mx-auto mt-4 max-w-[460px] text-[15px] text-white/60">Describe your product and run it. Every sentence is checked against a source before it reaches you.</p>
             <div className="relative mt-8 flex flex-wrap justify-center gap-3">
-              <Link href="/overview" className="inline-flex items-center gap-2 rounded-[10px] bg-[#FBF7F0] px-5 py-3.5 text-[15px] font-semibold text-ink hover:bg-white">Run it live <ArrowRight size={15} /></Link>
-              <Link href="/demo" className="inline-flex items-center gap-2 rounded-[10px] border border-white/25 px-5 py-3.5 text-[15px] font-semibold hover:bg-white/10"><Play size={14} />Watch the replay</Link>
+              <Link href="/overview" className="inline-flex items-center gap-2 rounded-[10px] bg-[#FBF7F0] px-5 py-3.5 text-[15px] font-semibold text-ink hover:bg-white">Try it live <ArrowRight size={15} /></Link>
+              <Link href="/demo" className="inline-flex items-center gap-2 rounded-[10px] border border-white/25 px-5 py-3.5 text-[15px] font-semibold hover:bg-white/10"><Play size={14} />Watch a recorded run</Link>
             </div>
           </div>
         </Reveal>
@@ -110,7 +110,7 @@ export default function Landing() {
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1160px] items-center justify-between px-6 py-6 text-[12px] text-ink/55">
           <span className="flex items-center gap-1.5 font-serif text-[16px] text-ink"><span className="grid h-5 w-5 place-items-center rounded-[5px] bg-accent font-sans text-[11px] font-bold text-white">C</span>Cited</span>
-          <span>Cited leads, checked claims, human-approved outreach.</span>
+          <span>Outreach you can back up.</span>
         </div>
       </footer>
     </div>

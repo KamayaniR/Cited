@@ -43,10 +43,10 @@ export function HeroBackdrop() {
 }
 
 const FEED = [
-  { who: "Reviewer", text: "Stopped an unsourced “Series D” claim", tag: "AGENT TASK", tone: "red", icon: ShieldAlert, dx: -32 },
-  { who: "Waiting on you", text: "Email to Jason Leet, CFO at Zylo", tag: "NEEDS YOUR OK", tone: "violet", icon: Send, dx: 0 },
-  { who: "Builder", text: "Linked 3 sources for Zylo", tag: "AGENT TASK", tone: "green", icon: Link2, dx: -16 },
-  { who: "Planner", text: "ICP v1 ready in 22 seconds", tag: "AGENT TASK", tone: "green", icon: Sparkles, dx: 16 },
+  { who: "Reviewer", text: "Removed “Series D”: no source found", tag: "AGENT TASK", tone: "red", icon: ShieldAlert, dx: -32 },
+  { who: "Ready for you", text: "Email to Jason Leet, CFO at Zylo", tag: "NEEDS APPROVAL", tone: "violet", icon: Send, dx: 0 },
+  { who: "Builder", text: "Found 3 sources for Zylo", tag: "AGENT TASK", tone: "green", icon: Link2, dx: -16 },
+  { who: "Planner", text: "Drafted your ICP in 22 seconds", tag: "AGENT TASK", tone: "green", icon: Sparkles, dx: 16 },
 ];
 const TONE: Record<string, string> = { red: "bg-danger/10 text-danger", violet: "bg-accent/10 text-accent", green: "bg-tier-a/10 text-tier-a" };
 
@@ -76,7 +76,7 @@ const CHIPS = [
   { text: "NetSuite move · careers page", ok: true, pos: "-left-6 bottom-20" },
   { text: "Series D · no source", ok: false, pos: "-right-8 bottom-32" },
 ];
-const TILES = [["100%", "leads cited"], ["<10 ms", "claim checks"], ["0", "sends without approval"], ["4", "agents, one gate"]];
+const TILES = [["100%", "leads cited"], ["<10 ms", "claim checks"], ["0", "sends without approval"], ["4", "agents, you approve"]];
 
 export function AppWindow() {
   return (
@@ -126,7 +126,7 @@ export function AgentRail() {
   );
 }
 
-/* ---------- The old way leaks proof ---------- */
+/* ---------- Where the source gets lost ---------- */
 const TOOLS = [{ icon: Database, label: "Lead list" }, { icon: Users, label: "Enrichment" }, { icon: Send, label: "Sequencer" }, { icon: PenLine, label: "AI writer" }];
 export function OldWay() {
   const ys = [40, 112, 184, 256];
@@ -156,7 +156,7 @@ export function OldWay() {
           <span className="absolute -inset-3 animate-[spin_24s_linear_infinite] rounded-full border border-dashed border-accent/30 motion-reduce:animate-none" />
           <span className="relative grid h-16 w-16 place-items-center rounded-[16px] bg-accent font-serif text-[28px] text-white">C</span>
         </div>
-        <p className="mt-5 font-serif text-[22px] leading-snug">One engine.<br />Every line linked.</p>
+        <p className="mt-5 font-serif text-[22px] leading-snug">One place.<br />Every claim cited.</p>
         <div className="mt-3 flex justify-center gap-1.5">{[0, 1, 2, 3].map((i) => <span key={i} className="c-pop inline-flex items-center gap-0.5 rounded-full bg-tier-a/10 px-2 py-0.5 text-tier-a" style={{ animationDelay: `${i * 0.4}s` }}><Link2 size={10} /><Check size={10} /></span>)}</div>
       </div>
     </div>
@@ -170,7 +170,7 @@ const KIND: Record<Kind, { tag: string; icon: typeof Check; tile: string; card: 
   agent: { tag: "AGENT", icon: Check, tile: "bg-tier-a/10 text-tier-a", card: "border-line" },
   user: { tag: "YOU", icon: User, tile: "bg-[#F3ECE0] text-ink/60", card: "border-line" },
   blocked: { tag: "BLOCKED", icon: X, tile: "bg-danger/10 text-danger", card: "border-danger/30" },
-  approval: { tag: "NEEDS YOUR OK", icon: Hand, tile: "bg-accent/10 text-accent", card: "border-accent shadow-[0_0_0_4px_rgba(106,53,224,0.15)] c-agent" },
+  approval: { tag: "NEEDS APPROVAL", icon: Hand, tile: "bg-accent/10 text-accent", card: "border-accent shadow-[0_0_0_4px_rgba(106,53,224,0.15)] c-agent" },
 };
 
 export function Board({ stage, tasks }: { stage: string; tasks: Task[] }) {
@@ -195,11 +195,11 @@ export function Board({ stage, tasks }: { stage: string; tasks: Task[] }) {
 }
 
 export const CHAPTERS: { n: string; label: string; title: string; body: string; stage: string; tasks: Task[] }[] = [
-  { n: "1.0", label: "FIND", title: "Spot the companies that need you now.", body: "Describe your product in two lines. Agents draft your ICP and surface real companies, each with a cited reason to reach out.", stage: "SIGNAL",
+  { n: "1.0", label: "FIND", title: "Find companies that need it now.", body: "Describe your product in a couple of lines. Cited drafts an ideal customer profile and finds real companies, each with the page that shows why they fit.", stage: "SIGNAL",
     tasks: [{ text: "Describe the product", kind: "user" }, { text: "Draft the ICP", kind: "agent" }, { text: "Discover companies", kind: "agent" }, { text: "Find the buyer", kind: "agent" }] },
-  { n: "2.0", label: "PROVE", title: "Every sentence earns its place.", body: "Drafts are checked line by line against stored evidence. A claim without a source is struck out before you ever see it.", stage: "EVIDENCE",
+  { n: "2.0", label: "PROVE", title: "Check every claim before you see it.", body: "Each draft is checked sentence by sentence against what Cited found. Anything it can’t back up gets flagged and taken out.", stage: "EVIDENCE",
     tasks: [{ text: "Write the outreach", kind: "agent" }, { text: "Check 4 claims", kind: "agent" }, { text: "“Series D”: no source", kind: "blocked" }, { text: "Attach every source", kind: "agent" }] },
-  { n: "3.0", label: "SEND", title: "Nothing leaves without your yes.", body: "You approve, Cited sends, and the pipeline moves on its own as replies come in.", stage: "PIPELINE",
+  { n: "3.0", label: "SEND", title: "You decide what gets sent.", body: "You read the draft and approve it. Cited sends it and keeps the pipeline up to date as people reply.", stage: "PIPELINE",
     tasks: [{ text: "Read the draft", kind: "user" }, { text: "Approve the send", kind: "approval" }, { text: "Track the reply", kind: "agent" }, { text: "Book the meeting", kind: "user" }] },
 ];
 
