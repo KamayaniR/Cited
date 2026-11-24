@@ -32,8 +32,8 @@ MATCH (c)-[:has_signal]->(e:Signal)
 WHERE e.type IN ['tech_adoption', 'funding', 'leadership_change', 'expansion']
 OPTIONAL MATCH (p:Person)-[:works_at]->(c), (p)-[:matched_to]->(:Product)
 RETURN c.name AS company, c.id AS companyId, c.tier AS tier, h.summary AS hiring, h.url AS hiringUrl,
-       collect(DISTINCT e.summary) AS evaluation, p.name AS buyer, p.title AS buyerTitle
-ORDER BY c.score DESC`,
+       collect(DISTINCT e.summary) AS evaluation, p.name AS buyer, p.title AS buyerTitle, c.score AS score
+ORDER BY score DESC`,
   displacement: `MATCH (:Product)-[:competes_with]->(k:Competitor)<-[u:uses]-(c:Company)
 WHERE c.excluded = false AND c.org = $org
 MATCH (c)-[:has_signal]->(s:Signal {id: u.signalId})
