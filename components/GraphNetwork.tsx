@@ -24,6 +24,7 @@ export function GraphNetwork({ nodes, edges, highlight }: { nodes: NetNode[]; ed
   const tiers = useRef(new Map<string, { tier: unknown; changedAt: number }>());
   const [width, setWidth] = useState(800);
   const [hover, setHover] = useState<{ n: NetNode; x: number; y: number } | null>(null);
+  const [selected, setSelected] = useState<NetNode | null>(null);
   const view = useRef({ scale: 1, ox: 0, oy: 0 });
 
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
@@ -32,6 +33,18 @@ export function GraphNetwork({ nodes, edges, highlight }: { nodes: NetNode[]; ed
     for (const e of edges) { d.set(e.from, (d.get(e.from) ?? 0) + 1); d.set(e.to, (d.get(e.to) ?? 0) + 1); }
     return d;
   }, [edges]);
+
+  // Each node's connections, in words, for the hover tip and the detail card.
+  const links = useMemo(() => {
+    const m = new Map<string, { verb: string; other: NetNode }[]>();
+    const add = (id: string, verb: string, other?: NetNode) => { if (other) m.set(id, [...(m.get(id) ?? []), { verb, other }]); };
+    for (const e of edges) {
+      const [fwd, back] = VERB[e.type] ?? [e.type.replace(/_/g, " "), e.type.replace(/_/g, " ")];
+      add(e.from, fwd, byId.get(e.to)); add(e.to, back, byId.get(e.from));
+    }
+    return m;
+  }, [edges, byId]);
+  const focus = useMemo(() => selected ? new Set([selected.id, ...(links.get(selected.id) ?? []).map((l) => l.other.id)]) : highlight, [selected, links, highlight]);
 
   useEffect(() => {
     const el = wrap.current; if (!el) return;
@@ -91,7 +104,7 @@ export function GraphNetwork({ nodes, edges, highlight }: { nodes: NetNode[]; ed
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, HEIGHT);
-      const hl = highlight && highlight.size ? highlight : null;
+      const hl = focus && focus.size ? focus : null;
 
       for (const e of edges) {
         const a = P(e.from), b = P(e.to); if (!a || !b) continue;
@@ -123,10 +136,15 @@ export function GraphNetwork({ nodes, edges, highlight }: { nodes: NetNode[]; ed
         }
         ctx.fillStyle = rgba(col, a); ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = rgba("#ffffff", a); ctx.lineWidth = 1; ctx.stroke();
-        const showLabel = (hl ? on : n.label === "Product" || (n.label === "Company" && (n.props.tier === "A" || n.props.tier === "B") && !n.props.excluded)) && a > 0.5;
+        // Companies, competitors and the product are always named; people and signals when lit.
+        const always = n.label === "Product" || n.label === "Competitor" || (n.label === "Company" && !n.props.excluded);
+        const showLabel = (hl ? on && n.label !== "Signal" : always) && a > 0.5;
         if (showLabel) {
-          ctx.font = "500 11px Inter, system-ui, sans-serif"; ctx.fillStyle = rgba("#14161A", 0.85); ctx.textAlign = "center";
-          ctx.fillText(name(n).slice(0, 28), p.x, p.y - r - 5);
+          ctx.font = `${n.label === "Company" || n.label === "Product" ? 600 : 500} 11px Inter, system-ui, sans-serif`; ctx.textAlign = "center";
+          const txt = name(n).slice(0, 24);
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.strokeText(txt, p.x, p.y - r - 5);
+          ctx.fillStyle = rgba(n.label === "Company" || n.label === "Product" ? "#14161A" : col, 0.9);
+          ctx.fillText(txt, p.x, p.y - r - 5);
         }
       }
       const moving = hl || pts.some((p) => t - p.born < 800) || [...tiers.current.values()].some((x) => x.changedAt && t - x.changedAt < 2400);
@@ -134,7 +152,7 @@ export function GraphNetwork({ nodes, edges, highlight }: { nodes: NetNode[]; ed
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [width, nodes, edges, highlight, byId, degree, layoutTick]);
+  }, [width, nodes, edges, focus, byId, degree, layoutTick]);
 
   const onMove = (e: React.MouseEvent) => {
     const rect = canvas.current!.getBoundingClientRect();
@@ -148,19 +166,65 @@ export function GraphNetwork({ nodes, edges, highlight }: { nodes: NetNode[]; ed
     }
     setHover(best ? { n: best.n, x: best.x, y: best.y } : null);
   };
-  const onClick = () => { const u = hover?.n.props.url; if (typeof u === "string") window.open(u, "_blank", "noopener"); };
+  const onClick = () => setSelected(hover && hover.n.id !== selected?.id ? hover.n : null);
 
   return (
     <div ref={wrap} className="relative w-full" style={{ height: HEIGHT }}>
-      <canvas ref={canvas} style={{ width, height: HEIGHT }} className={hover?.n.props.url ? "cursor-pointer" : ""} onMouseMove={onMove} onMouseLeave={() => setHover(null)} onClick={onClick} aria-label="Knowledge graph network" role="img" />
+      <canvas ref={canvas} style={{ width, height: HEIGHT }} className={hover ? "cursor-pointer" : ""} onMouseMove={onMove} onMouseLeave={() => setHover(null)} onClick={onClick} aria-label="Knowledge graph network" role="img" />
       {hover && (
         <div className="pointer-events-none absolute z-10 max-w-[260px] -translate-x-1/2 -translate-y-[calc(100%+12px)] rounded-[6px] bg-ink px-2.5 py-1.5 text-[12px] text-white shadow-lg" style={{ left: hover.x, top: hover.y }}>
           <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: color(hover.n) }} /><span className="text-white/60">{hover.n.label}</span></div>
           <div className="font-medium">{name(hover.n)}</div>
           {detail(hover.n) && <div className="text-white/70">{detail(hover.n)}</div>}
-          {typeof hover.n.props.url === "string" && <div className="mt-0.5 truncate font-mono text-[10px] text-white/60">{hostOf(hover.n.props.url)} · click to open</div>}
+          {(links.get(hover.n.id) ?? []).slice(0, 3).map((l, i) => <div key={i} className="text-white/70">{l.verb} <span className="text-white">{name(l.other).slice(0, 40)}</span></div>)}
+          <div className="mt-0.5 text-[10px] text-white/50">Click for details</div>
         </div>
       )}
+      {selected && <DetailCard n={selected} links={links.get(selected.id) ?? []} onClose={() => setSelected(null)} onPick={setSelected} />}
+    </div>
+  );
+}
+
+/** Plain-words verbs for each edge type: [from → to, to → from]. */
+const VERB: Record<string, [string, string]> = {
+  works_at: ["works at", "employs"],
+  competes_with: ["competes with", "competes with"],
+  matched_to: ["is a lead for", "has lead"],
+  has_signal: ["shows signal", "signal at"],
+  uses: ["uses", "used by"],
+  previously_employed_at: ["previously worked at", "former employer of"],
+  studied_at: ["studied at", "alma mater of"],
+  contacted_via: ["contacted via", "used to contact"],
+  replied_to: ["replied to", "got a reply from"],
+};
+
+function DetailCard({ n, links, onClose, onPick }: { n: NetNode; links: { verb: string; other: NetNode }[]; onClose: () => void; onPick: (n: NetNode) => void }) {
+  const url = typeof n.props.url === "string" ? n.props.url : typeof n.props.domain === "string" && n.props.domain ? `https://${n.props.domain}` : null;
+  const groups = Object.entries(Object.groupBy(links, (l) => l.verb));
+  return (
+    <div role="dialog" aria-label={`${n.label} details`} className="absolute top-3 right-3 z-20 max-h-[calc(100%-24px)] w-[280px] overflow-y-auto rounded-[10px] border border-line bg-white p-3 text-[12px] shadow-xl">
+      <div className="flex items-start gap-2">
+        <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color(n) }} />
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] tracking-wider text-muted uppercase">{n.label}</div>
+          <div className="text-[14px] leading-snug font-semibold">{name(n)}</div>
+          {detail(n) && <div className="text-muted">{detail(n)}</div>}
+        </div>
+        <button onClick={onClose} aria-label="Close details" className="rounded p-0.5 text-muted hover:bg-line/60">✕</button>
+      </div>
+      {url && <a href={url} target="_blank" rel="noreferrer" className="mt-2 inline-flex max-w-full items-center gap-1 truncate rounded-[5px] bg-accent/10 px-1.5 py-0.5 font-mono text-[10.5px] text-accent hover:underline">{hostOf(url)} ↗</a>}
+      {groups.map(([verb, ls]) => (
+        <div key={verb} className="mt-2.5">
+          <div className="mb-1 text-[10.5px] font-medium text-muted">{verb[0].toUpperCase() + verb.slice(1)}</div>
+          <div className="flex flex-wrap gap-1">
+            {ls!.slice(0, 8).map((l) => (
+              <button key={l.other.id} onClick={() => onPick(l.other)} title={l.other.label} className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-line px-2 py-0.5 hover:border-accent">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color(l.other) }} /><span className="truncate">{name(l.other).slice(0, 36)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

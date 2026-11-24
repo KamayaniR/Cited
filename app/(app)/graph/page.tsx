@@ -1,9 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import { Badge, Card, PageTitle, Stat } from "@/components/ui";
-import { Tip, InfoTip } from "@/components/Tip";
-import { Share2, Handshake, Briefcase, Swords, Building2, User, GraduationCap, Users, Code2, Timer, Coins, ExternalLink, CircleDot, GitBranch, Lightbulb, CalendarClock } from "lucide-react";
+import { Badge, Card, PageTitle } from "@/components/ui";
+import { Tip } from "@/components/Tip";
+import { Share2, Handshake, Briefcase, Swords, Building2, User, GraduationCap, Users, Code2, Timer, Coins, ExternalLink, Lightbulb, CalendarClock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { RefreshButton } from "@/components/RefreshButton";
 import { api } from "@/components/api";
@@ -18,7 +18,6 @@ const TABS: { key: QueryKey; label: string; icon: typeof Share2; tip: string }[]
   { key: "hiring", label: "Hiring → evaluation", icon: Briefcase, tip: "Hiring for the role that evaluates a tool like ours" },
   { key: "displacement", label: "Competitor displacement", icon: Swords, tip: "Customers of a competitor, ideally near renewal" },
 ];
-const NODE_ICON: Record<string, typeof Share2> = { Company: Building2, Person: User, Product: CircleDot, Competitor: Swords, Signal: Lightbulb, Team: Users, School: GraduationCap, Org: Building2 };
 
 export default function GraphPage() {
   const { ws, refresh } = useWorkspace();
@@ -47,17 +46,21 @@ export default function GraphPage() {
     <div>
       {title}
 
-      {stats && (
-        <div className="mb-4 grid gap-3 md:grid-cols-[auto_auto_1fr]">
-          <Stat icon={CircleDot} label="nodes" value={stats.nodeCount} />
-          <Stat icon={GitBranch} label="edges" value={stats.edgeCount} tone="violet" />
-          <Card className="flex flex-wrap items-center gap-1.5 p-3.5">
-            <Badge tone={stats.engine === "neo4j" ? "green" : "neutral"} title={stats.engine === "neo4j" ? "Live Neo4j Aura" : "Neo4j isn't connected: the same queries run on an in-memory graph"}>{stats.engine === "neo4j" ? "Neo4j" : "In-memory"}</Badge>
-            {Object.entries(stats.nodes).map(([k, v]) => { const I = NODE_ICON[k] ?? CircleDot; return <Badge key={k} icon={I} title={k}>{v}</Badge>; })}
-          </Card>
-        </div>
+      {stats?.graph && (
+        <Card className="mb-4 overflow-hidden">
+          <div className="border-b border-line px-3.5 py-2.5">
+            <p className="text-[13px]">Everything Cited knows, as one map: <b>{stats.nodes.Company ?? 0} companies</b>, the <b>people</b> who work there, the <b>signals</b> we cited, your <b>competitors</b>, and your own <b>team</b>. Lines are relationships such as &ldquo;works at&rdquo; or &ldquo;previously worked at&rdquo;.</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-muted">
+              {Object.entries(LABEL_COLOR).filter(([k]) => stats.nodes[k]).map(([k, c]) => <span key={k} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{k}</span>)}
+              <span className="ml-auto">{highlight?.size ? `${res?.title}: ${highlight.size} nodes lit` : "Hover a dot to see its links, click it for details"}</span>
+              <Badge tone={stats.engine === "neo4j" ? "green" : "neutral"} title={stats.engine === "neo4j" ? "Live Neo4j Aura" : "Neo4j isn't connected: the same queries run on an in-memory graph"}>{stats.engine === "neo4j" ? "Neo4j" : "In-memory"} · {stats.nodeCount} nodes · {stats.edgeCount} links</Badge>
+            </div>
+          </div>
+          <GraphNetwork nodes={stats.graph.nodes} edges={stats.graph.edges} highlight={highlight} />
+        </Card>
       )}
 
+      <div className="mb-2 text-[12px] font-semibold tracking-wider text-muted uppercase">Ask the graph</div>
       <div className="mb-3 grid gap-2 md:grid-cols-3" role="tablist">
         {TABS.map((t) => {
           const on = tab === t.key && Boolean(res);
@@ -78,41 +81,47 @@ export default function GraphPage() {
       {busy && <Card className="grid place-items-center gap-2 p-10 text-[13px] text-muted"><Share2 size={20} className="animate-pulse" />Running…</Card>}
 
       {res && !busy && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-          <div>
-            <div className="mb-2 flex items-center gap-1.5 text-[12px] text-muted"><span className="font-semibold text-ink">{res.rows.length} results</span><InfoTip content={res.question} /></div>
-            {res.rows.length === 0 && <Card className="p-4 text-[13px] text-muted">No matches</Card>}
-            <div className="space-y-2">
-              {res.q === "warm" && (res.rows as WarmRow[]).map((r, i) => <WarmPath key={i} r={r} />)}
-              {res.q === "hiring" && (res.rows as HiringRow[]).map((r, i) => <HiringCard key={i} r={r} />)}
-              {res.q === "displacement" && (res.rows as DisplacementRow[]).map((r, i) => <DisplacementCard key={i} r={r} />)}
-            </div>
-          </div>
-          <Card className="h-fit overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-line px-3 py-2 text-[11px] text-muted">
-              <Code2 size={13} /><span className="font-semibold tracking-wider uppercase">Cypher</span>
-              <span className="ml-auto flex items-center gap-1">
-                <Badge tone={res.engine === "neo4j" ? "green" : "neutral"} title={res.fallback ?? (res.engine === "memory" ? "Neo4j isn't connected, so the same query ran on the in-memory graph with the same row shape." : "Ran on Neo4j")}>{res.fallback ? "memory · fallback" : res.engine}</Badge>
-                <Badge icon={Timer}>{res.ms.toFixed(1)} ms</Badge>
-              </span>
-            </div>
-            <pre className="max-h-[420px] overflow-auto bg-ink p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words text-white">{res.cypher}</pre>
+        <div>
+          <Card className="mb-2 flex flex-wrap items-center gap-2 border-l-4 border-l-accent p-3">
+            <Lightbulb size={16} className="text-accent" />
+            <span className="text-[14px] font-medium">{answer(res)}</span>
+            <span className="ml-auto flex items-center gap-1">
+              <Badge tone={res.engine === "neo4j" ? "green" : "neutral"} title={res.fallback ?? (res.engine === "memory" ? "Neo4j isn't connected, so the same query ran on the in-memory graph with the same row shape." : "Ran on Neo4j")}>{res.fallback ? "memory · fallback" : res.engine}</Badge>
+              <Badge icon={Timer}>{res.ms.toFixed(1)} ms</Badge>
+            </span>
           </Card>
-        </div>
-      )}
-
-      {stats?.graph && (
-        <Card className="mt-4 overflow-hidden">
-          <div className="flex flex-wrap items-center gap-3 border-b border-line px-3 py-2 text-[11px] text-muted">
-            <span className="flex items-center gap-1.5 font-semibold tracking-wider uppercase"><Share2 size={13} />Network</span>
-            {Object.entries(LABEL_COLOR).filter(([k]) => stats.nodes[k]).map(([k, c]) => <span key={k} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: c }} />{k}</span>)}
-            <span className="ml-auto">{highlight?.size ? `${res?.title}: ${highlight.size} nodes lit` : "Run a query to light up its path"}</span>
+          <div className="space-y-2">
+            {res.q === "warm" && (res.rows as WarmRow[]).map((r, i) => <WarmPath key={i} r={r} />)}
+            {res.q === "hiring" && (res.rows as HiringRow[]).map((r, i) => <HiringCard key={i} r={r} />)}
+            {res.q === "displacement" && (res.rows as DisplacementRow[]).map((r, i) => <DisplacementCard key={i} r={r} />)}
           </div>
-          <GraphNetwork nodes={stats.graph.nodes} edges={stats.graph.edges} highlight={highlight} />
-        </Card>
+          <details className="mt-2 text-[12px] text-muted">
+            <summary className="inline-flex cursor-pointer items-center gap-1 hover:text-ink"><Code2 size={13} />Show query (Cypher)</summary>
+            <pre className="mt-1.5 max-h-[320px] overflow-auto rounded-[8px] bg-ink p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-words text-white">{res.cypher}</pre>
+          </details>
+        </div>
       )}
     </div>
   );
+}
+
+/** One plain-English sentence answering the query. */
+function answer(res: Result): string {
+  const n = res.rows.length;
+  const uniq = (xs: (string | null | undefined)[]) => [...new Set(xs.filter(Boolean))] as string[];
+  if (!n) return res.q === "warm" ? "No shared employers or schools between your team and these buyers yet." : res.q === "hiring" ? "None of these companies is hiring for a role that would evaluate you right now." : "No company here is known to use a competitor yet.";
+  if (res.q === "warm") {
+    const r = res.rows[0] as WarmRow;
+    const cos = uniq((res.rows as WarmRow[]).map((x) => x.company));
+    return `${n} warm path${n > 1 ? "s" : ""} into ${cos.length} compan${cos.length > 1 ? "ies" : "y"}. For example, ${r.team} and ${r.person} (${r.company}) both ${r.viaLabel === "School" ? "studied at" : "worked at"} ${r.via}.`;
+  }
+  if (res.q === "hiring") {
+    const cos = uniq((res.rows as HiringRow[]).map((x) => x.company));
+    return `${cos.length} compan${cos.length > 1 ? "ies are" : "y is"} hiring for a role that would evaluate a tool like yours: ${cos.slice(0, 3).join(", ")}${cos.length > 3 ? "…" : ""}.`;
+  }
+  const rows = res.rows as DisplacementRow[];
+  const cos = uniq(rows.map((x) => x.company)), comps = uniq(rows.map((x) => x.competitor)), ren = uniq(rows.filter((x) => x.renewal).map((x) => x.company));
+  return `${cos.length} compan${cos.length > 1 ? "ies use" : "y uses"} ${comps.slice(0, 3).join(" or ")}${ren.length ? `, and ${ren.length} ${ren.length > 1 ? "are" : "is"} near renewal` : ""}.`;
 }
 
 /** The nodes a query's rows touch: their companies, people, team members, schools, competitors and evidence pages. */
