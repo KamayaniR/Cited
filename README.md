@@ -67,8 +67,8 @@ vercel.json          cron schedule
 | Stage | Scope | Status |
 |---|---|---|
 | P0 | Skeleton, schema, adapters with mocks, demo seed, app shell | Done |
-| P1 | Intake → ICP → discovery with citations → competitors → scoring | Next |
-| P2 | Enrichment, sequences, HITL queue, demo-inbox send, manual LinkedIn | |
+| P1 | Intake → ICP → discovery with citations → competitors → scoring | Done |
+| P2 | Enrichment, sequences, HITL queue, demo-inbox send, manual LinkedIn | Next |
 | P3 | Kanban, attribution, audit, analytics | |
 | P4 | Neo4j graph, 3 multi-hop queries, scheduled refresh | |
 | P5 | Flexprice metering and credit gate | |

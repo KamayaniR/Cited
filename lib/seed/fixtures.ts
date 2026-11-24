@@ -23,6 +23,28 @@ export const DEMO_PRODUCT = {
   excludeRegions: ["EU (GDPR review pending)"],
 };
 
+export const DEMO_ICP = {
+  industries: [
+    { name: "Software publishers", naics: "513210", confidence: 0.86 },
+    { name: "Freight transportation arrangement", naics: "488510", confidence: 0.71 },
+    { name: "Offices of physicians (multi-entity groups)", naics: "621111", confidence: 0.58 },
+  ],
+  companySize: { value: { minEmployees: 200, maxEmployees: 2000 }, confidence: 0.82 },
+  regions: { value: ["United States", "United Kingdom"], confidence: 0.9 },
+  personas: [
+    { title: "CFO", seniority: "c_level", confidence: 0.8 },
+    { title: "VP Finance", seniority: "vp", confidence: 0.77 },
+    { title: "Controller", seniority: "director", confidence: 0.84 },
+  ],
+  triggers: [
+    { signal: "Hiring accountants or finance data engineers", confidence: 0.79 },
+    { signal: "ERP migration to NetSuite or Sage Intacct", confidence: 0.74 },
+    { signal: "New CFO in the last 6 months", confidence: 0.66 },
+    { signal: "M&A adding legal entities", confidence: 0.61 },
+  ],
+  negativeSignals: ["Hiring freeze or layoffs", "Uses a direct competitor signed in the last 12 months", "HQ in the EU"],
+};
+
 export const DEMO_TEAM = [
   { id: "team_maya", name: "Maya Chen", role: "Co-founder, CEO", previouslyAt: "Stratus Data", school: "UC Berkeley" },
   { id: "team_arjun", name: "Arjun Rao", role: "Co-founder, CTO", previouslyAt: "Plaid", school: "Carnegie Mellon" },
@@ -103,14 +125,22 @@ export const DEMO_COMPETITORS = [
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
 
-export const MOCK_SEARCH_RESULTS: SearchResult[] = DEMO_COMPANIES.flatMap((c) =>
-  c.signals.map((s, i) => ({
-    url: `https://${c.domain}${s.path}`,
-    title: `${c.name}: ${s.summary}`,
-    content: `${c.name} (${c.industry}, about ${c.headcount} employees, ${c.region}). ${s.summary}.`,
-    score: 0.9 - i * 0.1,
+export const MOCK_SEARCH_RESULTS: SearchResult[] = [
+  ...DEMO_COMPANIES.flatMap((c) =>
+    c.signals.map((s, i) => ({
+      url: `https://${c.domain}${s.path}`,
+      title: `${c.name}: ${s.summary}`,
+      content: `${c.name} (${c.industry}, about ${c.headcount} employees, ${c.region}). ${s.summary}.`,
+      score: 0.9 - i * 0.1,
+    })),
+  ),
+  ...DEMO_COMPETITORS.map((c) => ({
+    url: `https://${c.domain}/`,
+    title: `${c.name} alternatives and competitors: ${c.positioning}`,
+    content: `${c.name}: ${c.positioning}. Pricing: ${c.pricing}.`,
+    score: 0.5,
   })),
-);
+];
 
 function findPerson(domain: string, first: string, last: string) {
   const c = DEMO_COMPANIES.find((x) => x.domain === domain);

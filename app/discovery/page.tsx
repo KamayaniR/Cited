@@ -1,23 +1,54 @@
 "use client";
+import { useState } from "react";
+import { api } from "@/components/api";
+import { Button } from "@/components/ui";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { Badge, Card, PageTitle, TierBadge } from "@/components/ui";
 import { EmptyState } from "@/components/EmptyState";
-import { StageNote } from "@/components/StageNote";
 
 const EMAIL_TONE = { valid: "green", accept_all: "amber", invalid: "red", unknown: "neutral" } as const;
 
+type RunResult = { queries: string[]; companies: unknown[]; filtered: unknown[]; dropped: { name: string; reason: string }[]; mode: string };
+
+function RunDiscovery({ onDone }: { onDone: (r: RunResult) => void }) {
+  const { ws, refresh } = useWorkspace();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ready = Boolean(ws?.icp?.approvedAt);
+  const run = async () => {
+    setBusy(true); setError(null);
+    try { onDone(await api<RunResult>("/api/discover", { method: "POST" })); await refresh(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="flex items-center gap-3">
+      {error && <span className="text-[12px] text-danger">{error}</span>}
+      {!ready && <span className="text-[12px] text-muted">Approve the ICP first</span>}
+      <Button onClick={run} disabled={busy || !ready}>{busy ? "Discovering…" : "Run discovery"}</Button>
+    </div>
+  );
+}
+
 export default function DiscoveryPage() {
   const { ws } = useWorkspace();
-  if (!ws?.companies.length) return (<div><PageTitle kicker="Discovery" title="Cited companies" /><EmptyState what="companies" /></div>);
+  const [last, setLast] = useState<RunResult | null>(null);
+  if (!ws?.companies.length) return (<div><PageTitle kicker="Discovery" title="Cited companies"><RunDiscovery onDone={setLast} /></PageTitle><EmptyState what="companies" /></div>);
   const rows = [...ws.companies].sort((a, b) => Number(a.excluded) - Number(b.excluded) || b.score - a.score);
   return (
     <div>
-      <PageTitle kicker="Discovery" title="Cited companies" />
-      <StageNote stage="P1">Live Tavily discovery with citation validation runs next. Rows below come from the demo seed.</StageNote>
+      <PageTitle kicker="Discovery" title="Cited companies"><RunDiscovery onDone={setLast} /></PageTitle>
+      {last && (
+        <Card className="mb-4 p-3 text-[12px]">
+          <div><span className="font-semibold">{last.companies.length}</span> cited companies, <span className="font-semibold">{last.filtered.length}</span> filtered, <span className="font-semibold">{last.dropped.length}</span> dropped for missing citations · {last.mode} mode</div>
+          {last.dropped.map((d) => <div key={d.name} className="mt-1 text-danger">Dropped {d.name}: {d.reason}</div>)}
+          <details className="mt-1 text-muted"><summary className="cursor-pointer">{last.queries.length} search queries</summary>{last.queries.map((q) => <div key={q} className="font-mono text-[11px]">{q}</div>)}</details>
+        </Card>
+      )}
       <Card className="overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead className="sticky top-0 bg-paper text-left text-[11px] uppercase tracking-wider text-muted">
-            <tr>{["Score", "Company", "Industry", "Size", "HQ", "Signals", "Buyer", "Email", "LinkedIn", "Sources"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
+            <tr>{["Score", "Fit / Intent", "Company", "Industry", "Size", "HQ", "Signals", "Buyer", "Email", "LinkedIn", "Sources"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-line">
             {rows.map((c) => {
@@ -28,11 +59,12 @@ export default function DiscoveryPage() {
               return (
                 <tr key={c.id} className={`hover:bg-paper ${c.excluded ? "opacity-60" : ""}`}>
                   <td className="px-3 py-1.5">{c.excluded ? <Badge tone="red" title={c.excludeReason ?? ""}>Filtered</Badge> : <TierBadge tier={c.tier} score={c.score} />}</td>
+                  <td className="px-3 py-1.5 font-mono text-[11px] text-muted">{c.fitScore} / {c.intentScore}</td>
                   <td className="px-3 py-1.5 font-medium">{c.name}<div className="font-mono text-[11px] font-normal text-muted">{c.domain}</div>{c.excluded && <div className="text-[11px] font-normal text-danger">{c.excludeReason}</div>}</td>
                   <td className="px-3 py-1.5">{c.industry}</td>
                   <td className="px-3 py-1.5 font-mono text-[12px]">{c.headcount}</td>
                   <td className="px-3 py-1.5">{c.hq ?? <span className="text-muted">–</span>}{c.hqSource && <div><Badge>{c.hqSource}</Badge></div>}</td>
-                  <td className="px-3 py-1.5 text-[12px]">{signals.map((s) => <div key={s.id}>{s.summary}</div>)}</td>
+                  <td className="min-w-[240px] px-3 py-1.5 text-[12px]">{signals.map((s) => <div key={s.id}>{s.summary}</div>)}</td>
                   <td className="px-3 py-1.5">{buyer ? <>{buyer.name}<div className="text-[11px] text-muted">{buyer.title}</div></> : "–"}</td>
                   <td className="px-3 py-1.5">{buyer && <Badge tone={EMAIL_TONE[buyer.emailStatus]} title={`MX: ${buyer.mx ? "yes" : "no"} · source: ${buyer.emailSource ?? "none"}`}>{buyer.emailStatus.replace("_", "-")}</Badge>}</td>
                   <td className="px-3 py-1.5">{buyer?.linkedinUrl ? <a className="text-accent hover:underline" href={buyer.linkedinUrl} target="_blank" rel="noreferrer">profile</a> : <span className="text-muted">–</span>}</td>
@@ -44,13 +76,14 @@ export default function DiscoveryPage() {
         </table>
       </Card>
       <h2 className="mt-8 mb-3 font-serif text-xl">Competitor map</h2>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {ws.competitors.map((c) => (
           <Card key={c.id} className="p-4 text-[13px]">
             <div className="flex items-center justify-between"><span className="font-medium">{c.name}</span><Badge>{c.category.replace("_", " ")}</Badge></div>
             <p className="mt-1 text-muted">{c.positioning}</p>
             <p className="mt-2 text-[12px]"><span className="text-muted">Pricing:</span> {c.pricing}</p>
             <p className="mt-1 text-[12px]"><span className="text-muted">Our advantage:</span> {c.ourAdvantage}</p>
+            <a href={c.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 block text-[12px] text-accent hover:underline">[1] {new URL(c.sourceUrl).hostname}</a>
           </Card>
         ))}
       </div>

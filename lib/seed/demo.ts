@@ -1,7 +1,7 @@
 import type { Workspace, Company, Person, Lead, Message, Signal, Citation, Source } from "@/lib/types";
 import { emptyWorkspace } from "@/lib/db/store";
 import { combineScore, tierFor } from "@/lib/pipeline/scoring";
-import { DEMO_COMPANIES, DEMO_COMPETITORS, DEMO_PRODUCT, mockPersonContact } from "./fixtures";
+import { DEMO_COMPANIES, DEMO_COMPETITORS, DEMO_ICP, DEMO_PRODUCT, mockPersonContact } from "./fixtures";
 
 /**
  * Deterministic demo workspace (mock mode). Built so every invariant the real pipeline enforces
@@ -15,27 +15,7 @@ export function buildDemoWorkspace(now = new Date()): Workspace {
   ws.product = { id: "prod_ledgerlight", ...DEMO_PRODUCT };
   ws.icp = {
     id: "icp_1", version: 1, approvedAt: at(50),
-    data: {
-      industries: [
-        { name: "Software publishers", naics: "513210", confidence: 0.86 },
-        { name: "Freight transportation arrangement", naics: "488510", confidence: 0.71 },
-        { name: "Offices of physicians (multi-entity groups)", naics: "621111", confidence: 0.58 },
-      ],
-      companySize: { value: { minEmployees: 200, maxEmployees: 2000 }, confidence: 0.82 },
-      regions: { value: ["United States", "United Kingdom"], confidence: 0.9 },
-      personas: [
-        { title: "CFO", seniority: "c_level", confidence: 0.8 },
-        { title: "VP Finance", seniority: "vp", confidence: 0.77 },
-        { title: "Controller", seniority: "director", confidence: 0.84 },
-      ],
-      triggers: [
-        { signal: "Hiring accountants or finance data engineers", confidence: 0.79 },
-        { signal: "ERP migration to NetSuite or Sage Intacct", confidence: 0.74 },
-        { signal: "New CFO in the last 6 months", confidence: 0.66 },
-        { signal: "M&A adding legal entities", confidence: 0.61 },
-      ],
-      negativeSignals: ["Hiring freeze or layoffs", "Uses a direct competitor signed in the last 12 months", "HQ in the EU"],
-    },
+    data: DEMO_ICP,
   };
   ws.expansions = [{
     id: "exp_1", segment: "Multi-entity healthcare groups (NAICS 621111) after acquisitions", status: "accepted",
