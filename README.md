@@ -10,7 +10,7 @@ The idea behind the name: sales email is full of claims ("congrats on the Series
 
 ## Demo
 
-- **Live site:** _Vercel link coming_
+- **Live site:** https://cited-gray.vercel.app
 - **Run it yourself:** see [Running it](#running-it). Live mode uses real data only.
 
 | A draft being checked line by line | The app |
