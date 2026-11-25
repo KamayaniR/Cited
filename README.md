@@ -11,7 +11,6 @@ The idea behind the name: sales email is full of claims ("congrats on the Series
 ## Demo
 
 - **Live site:** https://cited-gray.vercel.app
-- **Run it yourself:** see [Running it](#running-it). Live mode uses real data only.
 
 | A draft being checked line by line | The app |
 |---|---|
@@ -199,40 +198,6 @@ tests/, e2e/         unit and end-to-end tests
 ```
 
 Pages call API routes, routes call `lib/pipeline`, and the pipeline calls adapters in `lib/providers`. The adapters are the only place that talks to vendors.
-
-## Running it
-
-You need Node 20 or newer.
-
-```bash
-npm install
-cp .env.example .env.local     # then fill in your own keys
-npm run dev
-```
-
-Open http://localhost:3000 for the landing page, or http://localhost:3000/overview for the app. On **Intake & ICP**, describe your product and approve the ICP, then click **Run the loop** in the top bar. It runs discovery, enrichment, drafting and the claim check, then stops and waits for your approval.
-
-**Live mode** is the default and only uses real data. If a required key is missing (LLM, Tavily or Hunter), that step stops with a message naming the key. Neo4j, Flexprice and Band fall back to local versions until their keys are set.
-
-**Demo mode** (`CITED_FORCE_MOCK=true`) runs everything on fictional `.example` companies, in a separate workspace file. The recorded run on the Demo tab and the end-to-end tests use it.
-
-### Environment variables
-
-All of these go in `.env.local`, which is never committed. `.env.example` lists them with empty values.
-
-| Variable | Used for |
-|---|---|
-| `LLAMA_API_KEY`, `LLAMA_MODEL`, `LLAMA_BASE_URL` | Main LLM (any OpenAI-compatible endpoint) |
-| `MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`, `MOSS_INDEX` | Evidence memory and claim check |
-| `TAVILY_API_KEY` | Search |
-| `HUNTER_API_KEY` | Email enrichment |
-| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Knowledge graph |
-| `BAND_API_KEY`, `BAND_ROOM_ID`, `BAND_*_KEY`, `BAND_API_URL` | Agent room |
-| `FLEXPRICE_API_KEY`, `FLEXPRICE_BASE_URL` | Metering and credits |
-| `SENDGRID_API_KEY`, `SENDGRID_FROM` | Email |
-| `DEMO_RECIPIENT`, `SENDING_ENABLED` | Where test emails go, and the on/off switch for sending |
-| `ANTHROPIC_API_KEY`, `APOLLO_API_KEY` | Optional fallbacks |
-| `SENTRY_DSN`, `POSTHOG_KEY`, `CRON_SECRET` | Optional monitoring and the scheduled refresh |
 
 ## Tests
 
