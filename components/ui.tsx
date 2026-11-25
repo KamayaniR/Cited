@@ -64,7 +64,7 @@ export function Avatar({ name, size = 26, title }: { name: string; size?: number
 }
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-[10px] border border-line bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04)] ${className}`}>{children}</div>;
+  return <div className={`rounded-[10px] border border-line bg-white shadow-[0_1px_2px_rgb(60_40_20/0.06),0_8px_24px_-12px_rgb(60_40_20/0.18)] ${className}`}>{children}</div>;
 }
 
 /** Page header: icon, short title, an (i) for the explanation, actions on the right. */

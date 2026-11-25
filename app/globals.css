@@ -2,11 +2,11 @@
 
 /* Brand tokens (spec Section 3) */
 @theme {
-  --color-paper: #FBF7F0;
+  --color-paper: #F7F1E6;
   --color-ink: #1E1A16;
   --color-accent: #6A35E0;
-  --color-muted: #6B6158;
-  --color-line: #EBE2D3;
+  --color-muted: #5E574D;
+  --color-line: #D6CBB8;
   --color-tier-a: #1F8A5B;
   --color-tier-b: #D97706;
   --color-tier-c: #9CA3AF;
