@@ -38,7 +38,6 @@ flowchart TB
 
 The browser never talks to a vendor. Every vendor call goes through an adapter in `lib/providers/`, and every action that costs money passes the credit gate first. More detail, including every Cypher query, is in [docs/system-design.md](docs/system-design.md).
 
-Other docs: [demo script](docs/demo-script.md).
 
 ## The problem we were given, and how Cited answers it
 
