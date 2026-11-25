@@ -13,7 +13,9 @@ import { mirrorEvent } from "@/lib/providers/band";
  */
 // Demo data and real data never share a file: demo mode (CITED_FORCE_MOCK) has its own workspace.
 const DEMO_MODE = process.env.CITED_FORCE_MOCK === "true";
-const DATA_FILE = path.join(process.cwd(), ".data", DEMO_MODE ? "demo-workspace.json" : "workspace.json");
+// On Vercel the app folder is read-only, so the workspace file lives in /tmp (kept only while an instance stays warm).
+const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "cited") : path.join(process.cwd(), ".data");
+const DATA_FILE = path.join(DATA_DIR, DEMO_MODE ? "demo-workspace.json" : "workspace.json");
 
 /** Demo companies all live on .example domains; real search never returns those. */
 export const isDemoData = (ws: Pick<Workspace, "companies">) => ws.companies.some((c) => c.domain.endsWith(".example"));
@@ -45,7 +47,6 @@ function load(): Workspace {
 }
 
 function persist(ws: Workspace) {
-  if (process.env.VERCEL) return; // read-only FS on Vercel: memory only
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(ws));

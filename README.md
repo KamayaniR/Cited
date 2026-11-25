@@ -6,8 +6,39 @@ Cited helps a B2B founder with no sales team find the right companies, reach the
 
 The idea behind the name: sales email is full of claims ("congrats on the Series C", "saw you're hiring a controller"). If one of those is wrong, the email is worse than no email. So Cited keeps the source for every fact from the moment it is found to the moment it is sent, and it refuses to let a sentence through if it can't point to where that fact came from.
 
-- System design: [docs/system-design.md](docs/system-design.md)
-- Demo script: [docs/demo-script.md](docs/demo-script.md)
+![Cited landing page](docs/screenshots/landing.png)
+
+## Demo
+
+- **Live site:** _Vercel link coming_
+- **Run it yourself:** see [Running it](#running-it). Live mode uses real data only.
+
+| A draft being checked line by line | The app |
+|---|---|
+| ![Claim check](docs/screenshots/claim-check.png) | ![Overview](docs/screenshots/app-overview.png) |
+
+## System architecture
+
+```mermaid
+flowchart TB
+  U["Founder or rep<br/>approves, edits or rejects every message"] --> UI["Next.js app<br/>pages + live agent-run view"]
+  UI --> API["API routes<br/>zod-validated, credit gate (402)"]
+  CRON["Scheduled refresh<br/>every 6 h"] --> API
+  BAND["Band room<br/>@planner @builder @reviewer @security @human"] <--> API
+  API --> AG["Agents<br/>Planner → Builder → Reviewer → Security"]
+  AG --> LLM["LLM (OpenAI-compatible)<br/>Meta muse-ember-1.0"]
+  AG --> TAV["Tavily<br/>search + domain check"]
+  AG --> HUN["Hunter<br/>email + MX"]
+  AG --> MOSS[("Moss<br/>evidence index, claim check")]
+  AG --> SG["SendGrid<br/>demo inbox only"]
+  API --> FLEX["Flexprice<br/>metered events, wallet"]
+  API --> DB[("Workspace store<br/>local JSON file")]
+  API --> NEO[("Neo4j<br/>or in-memory graph")]
+```
+
+The browser never talks to a vendor. Every vendor call goes through an adapter in `lib/providers/`, and every action that costs money passes the credit gate first. More detail, including every Cypher query, is in [docs/system-design.md](docs/system-design.md).
+
+Other docs: [demo script](docs/demo-script.md).
 
 ## The problem we were given, and how Cited answers it
 
@@ -51,6 +82,9 @@ The brief asked for an AI go-to-market engine in five modules, plus optional int
 The graph is mirrored to Neo4j after every change. Node ids match the workspace ids, so the two never drift. If Neo4j is not configured or a query fails, the same query runs on an in-memory copy of the graph, and the page says so with a small badge.
 
 **Three multi-hop queries** (`lib/graph/queries.ts`), each with a plain-English answer on the Graph page:
+
+![Knowledge graph page](docs/screenshots/graph.png)
+
 
 | Query | What it finds |
 |---|---|
@@ -219,6 +253,7 @@ The end-to-end test does three things:
 
 - **Storage:** the workspace is a local JSON file (`.data/workspace.json`). Supabase migrations are in `supabase/migrations/`, but the demo doesn't use them. This keeps one founder's data on one machine.
 - **Apollo:** we skipped it for the live demo, so LinkedIn URLs and career history only appear when Hunter returns them.
+- **Hosting on Vercel:** the landing page, the recorded demo and demo mode work there. For a full live run, use one long-running server (`npm run build && npm start`), because on Vercel the workspace file sits in `/tmp` on each serverless instance and is not shared between them. Moving the store to Supabase (schema already in `supabase/migrations/`) fixes that.
 - **Real recipients:** email only goes to the demo inbox unless you deploy to production and set `CITED_ALLOW_REAL_RECIPIENTS=true`.
 - **No scraping:** we don't scrape behind logins. Everything comes from public search results.
 
