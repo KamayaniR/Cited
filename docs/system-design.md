@@ -20,7 +20,7 @@ Safety rules the code enforces, not just the UI:
 flowchart LR
   U[Founder / rep] --> UI[Next.js app<br/>Kanban, queue, graph, billing]
   UI --> API[API routes<br/>zod-validated, one error format]
-  CRON[Vercel Cron, every 6 h] --> API
+  CRON[Vercel Cron, daily] --> API
   BAND[Band room<br/>planner, builder, reviewer, security, human] <--> API
   API --> AG[Agents<br/>planner, builder, reviewer, security]
   AG --> LLM[Claude or Moss Inference]
@@ -173,7 +173,7 @@ Moss grounds both ends: @builder drafts from the company's strongest evidence, a
 
 ### Scheduled refresh
 
-`lib/pipeline/refresh.ts`, called by `GET /api/cron/refresh` (Vercel Cron every 6 h, `CRON_SECRET`) and the "Run refresh now" button (`POST /api/signals/refresh`).
+`lib/pipeline/refresh.ts`, called by `GET /api/cron/refresh` (Vercel Cron daily, `CRON_SECRET`) and the "Run refresh now" button (`POST /api/signals/refresh`).
 
 1. Queue: Tier A/B (or the given ids), oldest refresh first, max 50.
 2. Per company: credit check (1 credit; out of credits → skipped and counted, never a 402 for cron) → fetch fresh signals (live: Tavily + LLM, only results on the company's site, naming its domain, or its full name; demo `.example` companies use fixtures) → add only new, cited signals → negative filter. A new negative signal marks the company filtered and withdraws its unsent drafts, with audit entries.

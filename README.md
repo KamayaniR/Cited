@@ -23,7 +23,7 @@ The idea behind the name: sales email is full of claims ("congrats on the Series
 flowchart TB
   U["Founder or rep<br/>approves, edits or rejects every message"] --> UI["Next.js app<br/>pages + live agent-run view"]
   UI --> API["API routes<br/>zod-validated, credit gate (402)"]
-  CRON["Scheduled refresh<br/>every 6 h"] --> API
+  CRON["Scheduled refresh<br/>daily"] --> API
   BAND["Band room<br/>@planner @builder @reviewer @security @human"] <--> API
   API --> AG["Agents<br/>Planner → Builder → Reviewer → Security"]
   AG --> LLM["LLM (OpenAI-compatible)<br/>Meta muse-ember-1.0"]
@@ -92,7 +92,7 @@ The graph is mirrored to Neo4j after every change. Node ids match the workspace 
 | Hiring → evaluation | Companies hiring for the role that would evaluate a tool like yours, alongside signals such as funding or a new system |
 | Competitor displacement | Companies using a competitor you beat, with the evidence and whether a renewal is coming up |
 
-**Keeping it fresh.** Signals refresh on a schedule (every 6 hours in `vercel.json`, or with the "Run refresh now" button). A refresh re-scores and re-tiers companies, and a new negative signal withdraws any unsent drafts for that company.
+**Keeping it fresh.** Signals refresh on a schedule (dailyours in `vercel.json`, or with the "Run refresh now" button). A refresh re-scores and re-tiers companies, and a new negative signal withdraws any unsent drafts for that company.
 
 ### Module 4: Enrichment and outreach
 
